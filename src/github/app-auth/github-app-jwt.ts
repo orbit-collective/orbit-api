@@ -1,5 +1,8 @@
 import {
-    importPKCS8,
+    createPrivateKey,
+} from "node:crypto";
+
+import {
     SignJWT,
 } from "jose";
 
@@ -7,11 +10,14 @@ import {
     getGitHubAppConfig,
 } from "./github-app.config";
 
-const JWT_ALGORITHM = "RS256";
+const JWT_ALGORITHM =
+    "RS256";
 
-const JWT_TTL_SECONDS = 9 * 60;
+const JWT_TTL_SECONDS =
+    9 * 60;
 
-const CLOCK_SKEW_SECONDS = 60;
+const CLOCK_SKEW_SECONDS =
+    60;
 
 export async function createGitHubAppJwt():
     Promise<string> {
@@ -19,9 +25,8 @@ export async function createGitHubAppJwt():
         getGitHubAppConfig();
 
     const privateKey =
-        await importPKCS8(
+        createPrivateKey(
             config.privateKey,
-            JWT_ALGORITHM,
         );
 
     const now =

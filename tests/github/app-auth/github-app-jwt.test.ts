@@ -38,7 +38,7 @@ describe(
             process.env.GITHUB_PRIVATE_KEY =
                 privateKey.export({
                     format: "pem",
-                    type: "pkcs8",
+                    type: "pkcs1",
                 }).toString();
         });
 
