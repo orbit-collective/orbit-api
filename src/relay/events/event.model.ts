@@ -1,0 +1,29 @@
+export type RelayEventType =
+    | "pull_request";
+
+export type RelayEventAction =
+    | "opened";
+
+export interface GitHubRelayEvent {
+    id: string;
+
+    connectionId: string;
+
+    deliveryId: string;
+
+    type: RelayEventType;
+
+    action: RelayEventAction;
+
+    installationId: number;
+
+    repositoryId: number;
+
+    pullRequestNumber: number;
+
+    pullRequestBody: string;
+
+    createdAt: string;
+
+    processedAt: string | null;
+}
