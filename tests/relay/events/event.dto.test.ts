@@ -1,0 +1,178 @@
+import {
+    describe,
+    expect,
+    it,
+} from "vitest";
+
+import {
+    toEventDto,
+} from "@/relay/events/event.dto";
+
+import type {
+    GitHubRelayEvent,
+} from "@/relay/events/event.model";
+
+describe(
+    "toEventDto",
+    () => {
+        it(
+            "returns public relay event representation",
+            () => {
+                const event:
+                    GitHubRelayEvent = {
+                    id:
+                        "event-1",
+
+                    connectionId:
+                        "connection-1",
+
+                    deliveryId:
+                        "delivery-1",
+
+                    type:
+                        "pull_request",
+
+                    action:
+                        "opened",
+
+                    installationId:
+                        123,
+
+                    repositoryId:
+                        456,
+
+                    pullRequestId:
+                        789,
+
+                    pullRequestNumber:
+                        42,
+
+                    pullRequestUrl:
+                        "https://github.com/orbit-collective/orbit/pull/42",
+
+                    pullRequestBody:
+                        "<!-- orbit-issue:213769 -->",
+
+                    createdAt:
+                        "2026-09-19T00:00:00.000Z",
+
+                    processedAt:
+                        null,
+                };
+
+                const dto =
+                    toEventDto(
+                        event,
+                    );
+
+                expect(
+                    dto,
+                ).toEqual({
+                    id:
+                        "event-1",
+
+                    type:
+                        "pull_request",
+
+                    action:
+                        "opened",
+
+                    deliveryId:
+                        "delivery-1",
+
+                    repository: {
+                        id:
+                            456,
+                    },
+
+                    pullRequest: {
+                        id:
+                            789,
+
+                        number:
+                            42,
+
+                        url:
+                            "https://github.com/orbit-collective/orbit/pull/42",
+
+                        body:
+                            "<!-- orbit-issue:213769 -->",
+                    },
+
+                    createdAt:
+                        "2026-09-19T00:00:00.000Z",
+                });
+            },
+        );
+
+        it(
+            "does not expose internal connection data",
+            () => {
+                const event:
+                    GitHubRelayEvent = {
+                    id:
+                        "event-1",
+
+                    connectionId:
+                        "secret-connection",
+
+                    deliveryId:
+                        "delivery",
+
+                    type:
+                        "pull_request",
+
+                    action:
+                        "opened",
+
+                    installationId:
+                        123,
+
+                    repositoryId:
+                        456,
+
+                    pullRequestId:
+                        789,
+
+                    pullRequestNumber:
+                        1,
+
+                    pullRequestUrl:
+                        "https://example.com",
+
+                    pullRequestBody:
+                        "",
+
+                    createdAt:
+                        "2026-09-19T00:00:00.000Z",
+
+                    processedAt:
+                        null,
+                };
+
+                const dto =
+                    toEventDto(
+                        event,
+                    );
+
+                expect(
+                    dto,
+                ).not.toHaveProperty(
+                    "connectionId",
+                );
+
+                expect(
+                    dto,
+                ).not.toHaveProperty(
+                    "installationId",
+                );
+
+                expect(
+                    dto,
+                ).not.toHaveProperty(
+                    "processedAt",
+                );
+            },
+        );
+    },
+);
