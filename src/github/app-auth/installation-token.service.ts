@@ -15,14 +15,28 @@ export class InstallationTokenService {
         const jwt =
             await createGitHubAppJwt();
 
-        return githubRequest<
-            GitHubInstallationAccessToken
-        >(
-            `/app/installations/${installationId}/access_tokens`,
+        const token =
+            await githubRequest<
+                GitHubInstallationAccessToken
+            >(
+                `/app/installations/${installationId}/access_tokens`,
+                {
+                    method: "POST",
+                    token: jwt,
+                },
+            );
+
+        console.log(
+            "GitHub installation token permissions",
             {
-                method: "POST",
-                token: jwt,
+                installationId,
+                permissions:
+                token.permissions,
+                repositorySelection:
+                token.repository_selection,
             },
         );
+
+        return token;
     }
 }
