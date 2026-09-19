@@ -19,7 +19,11 @@ export interface GitHubRelayEvent {
 
     repositoryId: number;
 
+    pullRequestId: number;
+
     pullRequestNumber: number;
+
+    pullRequestUrl: string;
 
     pullRequestBody: string;
 

@@ -246,6 +246,16 @@ export class GitHubWebhookService {
                 .pull_request
                 .number,
 
+            pullRequestId:
+            input.payload
+                .pull_request
+                .id,
+
+            pullRequestUrl:
+            input.payload
+                .pull_request
+                .html_url,
+
             pullRequestBody:
                 input.payload
                     .pull_request
