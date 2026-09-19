@@ -32,8 +32,20 @@
   status = 200
   force = true
 
- [[redirects]]
+[[redirects]]
    from = "/v1/github/webhooks"
    to = "/.netlify/functions/github-webhooks"
    status = 200
    force = true
+
+[[redirects]]
+  from = "/v1/github/events"
+  to = "/.netlify/functions/github-events"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/github/events/:eventId/ack"
+  to = "/.netlify/functions/github-events-ack?eventId=:eventId"
+  status = 200
+  force = true

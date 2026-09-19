@@ -41,39 +41,59 @@ export class EventRepository {
 
     public async listPending(
         connectionId: string,
+        limit = 50,
     ): Promise<GitHubRelayEvent[]> {
-        const store = getOrbitStore();
+        const store =
+            getOrbitStore();
 
-        const result = await store.list({
-            prefix: eventKeys.prefix(
-                connectionId,
-            ),
-        });
+        const result =
+            await store.list({
+                prefix:
+                    eventKeys.prefix(
+                        connectionId,
+                    ),
+            });
 
-        const events: GitHubRelayEvent[] = [];
+        const events:
+            GitHubRelayEvent[] = [];
 
-        for (const blob of result.blobs) {
-            const event = await store.get(
-                blob.key,
-                {
-                    type: "json",
-                    consistency: "strong",
-                },
-            ) as GitHubRelayEvent | null;
+        for (
+            const blob of result.blobs
+            ) {
+            const event =
+                await store.get(
+                    blob.key,
+                    {
+                        type: "json",
+                        consistency:
+                            "strong",
+                    },
+                ) as
+                    GitHubRelayEvent |
+                    null;
 
             if (
                 event &&
-                event.processedAt === null
+                event.processedAt ===
+                null
             ) {
-                events.push(event);
+                events.push(
+                    event,
+                );
             }
         }
 
-        return events.sort((a, b) =>
-            a.createdAt.localeCompare(
-                b.createdAt,
-            ),
-        );
+        return events
+            .sort(
+                (a, b) =>
+                    a.createdAt.localeCompare(
+                        b.createdAt,
+                    ),
+            )
+            .slice(
+                0,
+                limit,
+            );
     }
 
     public async markProcessed(
