@@ -3,25 +3,54 @@ import { getOrbitStore } from "@/shared/storage";
 import { connectionKeys } from "./connection.keys";
 import type { GitHubConnection } from "./connection.model";
 
+interface ConnectionLookup {
+    connectionId: string;
+}
+
 export class ConnectionRepository {
     public async create(
         connection: GitHubConnection,
     ): Promise<void> {
         const store = getOrbitStore();
 
+        const connectionResult =
+            await store.setJSON(
+                connectionKeys.byId(
+                    connection.id,
+                ),
+                connection,
+                {
+                    onlyIfNew: true,
+                },
+            );
+
+        if (!connectionResult.modified) {
+            throw new Error(
+                `Connection ${connection.id} already exists.`,
+            );
+        }
+
         await store.setJSON(
-            connectionKeys.byId(connection.id),
-            connection,
+            connectionKeys.byTokenHash(
+                connection.tokenHash,
+            ),
+            {
+                connectionId:
+                connection.id,
+            } satisfies ConnectionLookup,
             {
                 onlyIfNew: true,
             },
         );
 
         await store.setJSON(
-            connectionKeys.byTokenHash(connection.tokenHash),
+            connectionKeys.byStateHash(
+                connection.stateHash,
+            ),
             {
-                connectionId: connection.id,
-            },
+                connectionId:
+                connection.id,
+            } satisfies ConnectionLookup,
             {
                 onlyIfNew: true,
             },
@@ -34,7 +63,9 @@ export class ConnectionRepository {
         const store = getOrbitStore();
 
         return await store.get(
-            connectionKeys.byId(connectionId),
+            connectionKeys.byId(
+                connectionId,
+            ),
             {
                 type: "json",
                 consistency: "strong",
@@ -48,14 +79,38 @@ export class ConnectionRepository {
         const store = getOrbitStore();
 
         const lookup = await store.get(
-            connectionKeys.byTokenHash(tokenHash),
+            connectionKeys.byTokenHash(
+                tokenHash,
+            ),
             {
                 type: "json",
                 consistency: "strong",
             },
-        ) as {
-            connectionId: string;
-        } | null;
+        ) as ConnectionLookup | null;
+
+        if (!lookup) {
+            return null;
+        }
+
+        return this.findById(
+            lookup.connectionId,
+        );
+    }
+
+    public async findByStateHash(
+        stateHash: string,
+    ): Promise<GitHubConnection | null> {
+        const store = getOrbitStore();
+
+        const lookup = await store.get(
+            connectionKeys.byStateHash(
+                stateHash,
+            ),
+            {
+                type: "json",
+                consistency: "strong",
+            },
+        ) as ConnectionLookup | null;
 
         if (!lookup) {
             return null;
@@ -81,9 +136,7 @@ export class ConnectionRepository {
                 type: "json",
                 consistency: "strong",
             },
-        ) as {
-            connectionId: string;
-        } | null;
+        ) as ConnectionLookup | null;
 
         if (!lookup) {
             return null;
@@ -100,7 +153,9 @@ export class ConnectionRepository {
         const store = getOrbitStore();
 
         await store.setJSON(
-            connectionKeys.byId(connection.id),
+            connectionKeys.byId(
+                connection.id,
+            ),
             connection,
         );
 
@@ -114,8 +169,9 @@ export class ConnectionRepository {
                     connection.repositoryId,
                 ),
                 {
-                    connectionId: connection.id,
-                },
+                    connectionId:
+                    connection.id,
+                } satisfies ConnectionLookup,
             );
         }
     }

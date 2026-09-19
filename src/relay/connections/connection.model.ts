@@ -10,6 +10,10 @@ export interface GitHubConnection {
 
     tokenHash: string;
 
+    stateHash: string;
+
+    stateExpiresAt: string;
+
     installationId: number | null;
 
     repositoryId: number | null;

@@ -7,6 +7,10 @@ export const connectionKeys = {
         return `connection-token/${tokenHash}`;
     },
 
+    byStateHash(stateHash: string): string {
+        return `connection-state/${stateHash}`;
+    },
+
     byRepository(
         installationId: number,
         repositoryId: number,
