@@ -1,0 +1,11 @@
+[build]
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/v1/health"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
