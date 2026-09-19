@@ -69,12 +69,20 @@ export async function githubRequest<T>(
         const rawBody =
             await response.text();
 
+        const acceptedPermissions =
+            response.headers.get(
+                "X-Accepted-GitHub-Permissions",
+            );
+
         console.error(
             "GitHub API request failed",
             {
                 path,
                 status:
                 response.status,
+
+                acceptedPermissions,
+
                 body:
                 rawBody,
             },
