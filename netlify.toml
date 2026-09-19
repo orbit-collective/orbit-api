@@ -31,3 +31,9 @@
   to = "/.netlify/functions/github-callback"
   status = 200
   force = true
+
+ [[redirects]]
+   from = "/v1/github/webhooks"
+   to = "/.netlify/functions/github-webhooks"
+   status = 200
+   force = true
