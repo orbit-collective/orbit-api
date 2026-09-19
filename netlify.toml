@@ -45,12 +45,6 @@
   force = true
 
 [[redirects]]
-  from = "/v1/github/events/:eventId/ack"
-  to = "/.netlify/functions/github-events-ack?eventId=:eventId"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/v1/github/comments"
   to = "/.netlify/functions/github-comments"
   status = 200

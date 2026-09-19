@@ -1,4 +1,5 @@
 import type {
+    Config,
     Context,
 } from "@netlify/functions";
 
@@ -17,11 +18,11 @@ import {
 
 import {
     success,
-} from "@/shared/http.js";
+} from "@/shared/http";
 
 export default async function handler(
     request: Request,
-    _context: Context,
+    context: Context,
 ): Promise<Response> {
     return handleRequest(
         async () => {
@@ -50,15 +51,8 @@ export default async function handler(
                         request,
                     );
 
-            const url =
-                new URL(
-                    request.url,
-                );
-
             const eventId =
-                url.searchParams.get(
-                    "eventId",
-                );
+                context.params.eventId;
 
             if (!eventId) {
                 throw new ApiError(
@@ -86,3 +80,7 @@ export default async function handler(
         },
     );
 }
+
+export const config: Config = {
+    path: "/v1/github/events/:eventId/ack",
+};
