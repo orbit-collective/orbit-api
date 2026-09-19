@@ -26,7 +26,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "netlify functions:serve",
+    "dev:netlify": "netlify dev",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
