@@ -13,3 +13,15 @@
   to = "/.netlify/functions/health"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/connections"
+  to = "/.netlify/functions/github-connections-create"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/github/connections/me"
+  to = "/.netlify/functions/github-connections-me"
+  status = 200
+  force = true
