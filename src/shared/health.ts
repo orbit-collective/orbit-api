@@ -11,7 +11,7 @@ export function getHealthStatus(): HealthStatus {
     return {
         status: "ok",
         service: "orbit-api",
-        version: process.env.npm_package_version ?? "unknown",
+        version: process.env.APP_VERSION ?? "unknown",
         timestamp: now(),
     };
 }
