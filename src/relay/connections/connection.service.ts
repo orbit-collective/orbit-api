@@ -1,31 +1,27 @@
 import {
+    createGitHubInstallationUrl,
+} from "@/github/installations/github-installation-url";
+
+import {
     createConnection,
 } from "./connection.factory";
+
 import {
     ConnectionRepository,
 } from "./connection.repository";
+
 import {
     toConnectionDto,
     type GitHubConnectionDto,
 } from "./connection.dto";
 
 export interface CreateConnectionResult {
-    connection: GitHubConnectionDto;
+    connection:
+        GitHubConnectionDto;
 
-    /**
-     * Plaintext relay token.
-     *
-     * Returned exactly once to Orbit Local.
-     */
     token: string;
 
-    /**
-     * Temporary installation state.
-     *
-     * This will be replaced by an installation URL
-     * once GitHub App configuration is implemented.
-     */
-    state: string;
+    installUrl: string;
 }
 
 export class ConnectionService {
@@ -46,6 +42,11 @@ export class ConnectionService {
             connection,
         );
 
+        const installUrl =
+            createGitHubInstallationUrl(
+                state,
+            );
+
         return {
             connection:
                 toConnectionDto(
@@ -53,7 +54,8 @@ export class ConnectionService {
                 ),
 
             token,
-            state,
+
+            installUrl,
         };
     }
 }

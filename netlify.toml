@@ -25,3 +25,9 @@
   to = "/.netlify/functions/github-connections-me"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/callback"
+  to = "/.netlify/functions/github-callback"
+  status = 200
+  force = true
