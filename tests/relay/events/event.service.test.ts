@@ -54,6 +54,9 @@ function createEvent():
 
         processedAt:
             null,
+
+        expiresAt:
+            "2099-01-01T00:00:00.000Z",
     };
 }
 
@@ -210,6 +213,50 @@ describe(
                 ).rejects.toThrow(
                     "Relay event could not be found.",
                 );
+            },
+        );
+
+        it(
+            "rejects expired event acknowledgement",
+            async () => {
+                const expired =
+                    createEvent();
+
+                expired.expiresAt =
+                    "2020-01-01T00:00:00.000Z";
+
+                const repository = {
+                    listPending:
+                        vi.fn(),
+
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                expired,
+                            ),
+
+                    markProcessed:
+                        vi.fn(),
+                };
+
+                const service =
+                    new EventService(
+                        repository as never,
+                    );
+
+                await expect(
+                    service.acknowledge(
+                        "connection-1",
+                        "event-1",
+                    ),
+                ).rejects.toThrow(
+                    "Relay event has expired.",
+                );
+
+                expect(
+                    repository
+                        .markProcessed,
+                ).not.toHaveBeenCalled();
             },
         );
     },

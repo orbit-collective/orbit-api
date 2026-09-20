@@ -58,6 +58,18 @@ export class EventService {
         }
 
         if (
+            Date.parse(
+                event.expiresAt,
+            ) <= Date.now()
+        ) {
+            throw new ApiError(
+                "EVENT_EXPIRED",
+                "Relay event has expired.",
+                410,
+            );
+        }
+
+        if (
             event.processedAt !==
             null
         ) {

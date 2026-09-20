@@ -97,7 +97,11 @@ export class EventRepository {
             if (
                 event &&
                 event.processedAt ===
-                null
+                null &&
+                Date.parse(
+                    event.expiresAt,
+                ) >
+                Date.now()
             ) {
                 events.push(
                     event,
