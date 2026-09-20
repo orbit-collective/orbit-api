@@ -30,4 +30,6 @@ export interface GitHubRelayEvent {
     createdAt: string;
 
     processedAt: string | null;
+
+    expiresAt: string;
 }

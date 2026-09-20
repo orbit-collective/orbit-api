@@ -1,12 +1,6 @@
-import {
-    githubRequest,
-} from "./github-api";
-import {
-    createGitHubAppJwt,
-} from "./github-app-jwt";
-import type {
-    GitHubInstallationAccessToken,
-} from "./github.types";
+import {githubRequest,} from "./github-api";
+import {createGitHubAppJwt,} from "./github-app-jwt";
+import type {GitHubInstallationAccessToken,} from "./github.types";
 
 export class InstallationTokenService {
     public async create(
@@ -15,28 +9,14 @@ export class InstallationTokenService {
         const jwt =
             await createGitHubAppJwt();
 
-        const token =
-            await githubRequest<
-                GitHubInstallationAccessToken
-            >(
-                `/app/installations/${installationId}/access_tokens`,
-                {
-                    method: "POST",
-                    token: jwt,
-                },
-            );
-
-        console.log(
-            "GitHub installation token permissions",
+        return await githubRequest<
+            GitHubInstallationAccessToken
+        >(
+            `/app/installations/${installationId}/access_tokens`,
             {
-                installationId,
-                permissions:
-                token.permissions,
-                repositorySelection:
-                token.repository_selection,
+                method: "POST",
+                token: jwt,
             },
         );
-
-        return token;
     }
 }

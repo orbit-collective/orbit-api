@@ -34,6 +34,8 @@ import type {
     GitHubPullRequestWebhook,
 } from "./pull-request-webhook.model";
 
+const EVENT_TTL_HOURS = 24;
+
 export interface HandleWebhookInput {
     deliveryId: string;
 
@@ -368,6 +370,8 @@ export class GitHubWebhookService {
 
             processedAt:
                 null,
+
+            expiresAt: createEventExpiry(),
         };
 
         await this
@@ -387,4 +391,14 @@ export class GitHubWebhookService {
             relayEvent.id,
         };
     }
+}
+
+function createEventExpiry(): string {
+    return new Date(
+        Date.now() +
+        EVENT_TTL_HOURS *
+        60 *
+        60 *
+        1000,
+    ).toISOString();
 }

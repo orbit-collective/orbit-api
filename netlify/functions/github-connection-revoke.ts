@@ -1,13 +1,20 @@
 import type {
+    Config,
     Context,
 } from "@netlify/functions";
 
 import {
-    GitHubAppService,
-} from "@/github/app-auth/github-app.service";
+    ConnectionAuthenticator,
+} from "@/relay/auth/connection-auth";
+
+import {
+    ConnectionRevokeService,
+} from "@/relay/connections/connection-revoke.service";
+
 import {
     handleRequest,
 } from "@/shared/errors";
+
 import {
     success,
 } from "@/shared/http";
@@ -20,37 +27,43 @@ export default async function handler(
         async () => {
             if (
                 request.method !==
-                "GET"
+                "POST"
             ) {
                 return new Response(
                     null,
                     {
                         status: 405,
+
                         headers: {
-                            Allow: "GET",
+                            Allow: "POST",
                         },
                     },
                 );
             }
 
-            const service =
-                new GitHubAppService();
+            const authenticator =
+                new ConnectionAuthenticator();
 
-            const app =
-                await service
-                    .getAuthenticatedApp();
+            const connection =
+                await authenticator
+                    .authenticate(
+                        request,
+                    );
+
+            const service =
+                new ConnectionRevokeService();
+
+            await service.revoke(
+                connection,
+            );
 
             return success({
-                id: app.id,
-                slug: app.slug,
-                name: app.name,
-
-                owner:
-                app.owner.login,
-
-                url:
-                app.html_url,
+                revoked: true,
             });
         },
     );
 }
+
+export const config: Config = {
+    path: "/v1/github/connections/revoke",
+};

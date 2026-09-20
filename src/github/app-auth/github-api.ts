@@ -78,13 +78,8 @@ export async function githubRequest<T>(
             "GitHub API request failed",
             {
                 path,
-                status:
-                response.status,
-
+                status: response.status,
                 acceptedPermissions,
-
-                body:
-                rawBody,
             },
         );
 
