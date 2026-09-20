@@ -269,5 +269,127 @@ describe(
                 ).not.toHaveBeenCalled();
             },
         );
+
+        it(
+            "rejects pull request number that does not match event",
+            async () => {
+                const eventRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                event(),
+                            ),
+                };
+
+                const commentRepository = {
+                    findByEvent:
+                        vi.fn(),
+
+                    create:
+                        vi.fn(),
+                };
+
+                const tokenService = {
+                    create:
+                        vi.fn(),
+                };
+
+                const githubClient = {
+                    create:
+                        vi.fn(),
+                };
+
+                const service =
+                    new CommentService(
+                        eventRepository as never,
+                        commentRepository as never,
+                        tokenService as never,
+                        githubClient as never,
+                    );
+
+                await expect(
+                    service.create(
+                        connection(),
+                        {
+                            eventId:
+                                "event-1",
+
+                            pullRequestNumber:
+                                999,
+
+                            body:
+                                "test",
+                        },
+                    ),
+                ).rejects.toThrow(
+                    "Pull request number does not match the relay event.",
+                );
+
+                expect(
+                    githubClient.create,
+                ).not.toHaveBeenCalled();
+            },
+        );
+
+        it(
+            "does not allow access to event from another connection",
+            async () => {
+                const eventRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+                };
+
+                const commentRepository = {
+                    findByEvent:
+                        vi.fn(),
+
+                    create:
+                        vi.fn(),
+                };
+
+                const tokenService = {
+                    create:
+                        vi.fn(),
+                };
+
+                const githubClient = {
+                    create:
+                        vi.fn(),
+                };
+
+                const service =
+                    new CommentService(
+                        eventRepository as never,
+                        commentRepository as never,
+                        tokenService as never,
+                        githubClient as never,
+                    );
+
+                await expect(
+                    service.create(
+                        connection(),
+                        {
+                            eventId:
+                                "other-connection-event",
+
+                            pullRequestNumber:
+                                283,
+
+                            body:
+                                "test",
+                        },
+                    ),
+                ).rejects.toThrow(
+                    "Relay event could not be found.",
+                );
+
+                expect(
+                    githubClient.create,
+                ).not.toHaveBeenCalled();
+            },
+        );
     },
 );
