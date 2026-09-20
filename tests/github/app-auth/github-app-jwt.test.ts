@@ -35,6 +35,18 @@ describe(
             process.env.GITHUB_APP_ID =
                 "123456";
 
+            process.env.GITHUB_APP_SLUG =
+                "orbit-project-management";
+
+            process.env.GITHUB_CLIENT_ID =
+                "client-id";
+
+            process.env.GITHUB_CLIENT_SECRET =
+                "client-secret";
+
+            process.env.GITHUB_CALLBACK_URL =
+                "http://localhost:9999/v1/github/callback";
+
             process.env.GITHUB_PRIVATE_KEY =
                 privateKey.export({
                     format: "pem",
