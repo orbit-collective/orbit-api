@@ -7,14 +7,36 @@ export class EventRepository {
     public async create(
         event: GitHubRelayEvent,
     ): Promise<void> {
-        const store = getOrbitStore();
+        const store =
+            getOrbitStore();
+
+        const result =
+            await store.setJSON(
+                eventKeys.byId(
+                    event.connectionId,
+                    event.id,
+                ),
+                event,
+                {
+                    onlyIfNew: true,
+                },
+            );
+
+        if (!result.modified) {
+            throw new Error(
+                `Relay event ${event.id} already exists.`,
+            );
+        }
 
         await store.setJSON(
-            eventKeys.byId(
+            eventKeys.byDelivery(
                 event.connectionId,
-                event.id,
+                event.deliveryId,
             ),
-            event,
+            {
+                eventId:
+                event.id,
+            },
             {
                 onlyIfNew: true,
             },
@@ -126,5 +148,37 @@ export class EventRepository {
         );
 
         return updated;
+    }
+
+    public async findByDeliveryId(
+        connectionId: string,
+        deliveryId: string,
+    ): Promise<GitHubRelayEvent | null> {
+        const store =
+            getOrbitStore();
+
+        const lookup =
+            await store.get(
+                eventKeys.byDelivery(
+                    connectionId,
+                    deliveryId,
+                ),
+                {
+                    type: "json",
+                    consistency:
+                        "strong",
+                },
+            ) as {
+                eventId: string;
+            } | null;
+
+        if (!lookup) {
+            return null;
+        }
+
+        return this.findById(
+            connectionId,
+            lookup.eventId,
+        );
     }
 }

@@ -11,6 +11,10 @@ import {
 } from "@/shared/errors";
 
 import {
+    getErrorMessage,
+} from "@/shared/error-message";
+
+import {
     ConnectionRepository,
 } from "@/relay/connections/connection.repository";
 
@@ -63,51 +67,168 @@ export class GitHubWebhookService {
     public async handle(
         input: HandleWebhookInput,
     ): Promise<HandleWebhookResult> {
-        const deliveryCreated =
+        let delivery =
             await this.deliveryRepository
-                .create({
-                    id:
+                .findById(
                     input.deliveryId,
+                );
 
-                    event:
-                    input.event,
-
-                    action:
-                        input.payload
-                            .action ??
-                        null,
-
-                    receivedAt:
-                        now(),
-
-                    processedAt:
-                        null,
-                });
-
-        if (!deliveryCreated) {
+        if (
+            delivery?.status ===
+            "processed"
+        ) {
             return {
-                ignored:
-                    false,
-
-                duplicate:
-                    true,
-
-                relayEventId:
-                    null,
+                ignored: false,
+                duplicate: true,
+                relayEventId: null,
             };
         }
 
+        if (!delivery) {
+            delivery = {
+                id:
+                input.deliveryId,
+
+                event:
+                input.event,
+
+                action:
+                    input.payload
+                        .action ??
+                    null,
+
+                status:
+                    "received",
+
+                receivedAt:
+                    now(),
+
+                processingStartedAt:
+                    null,
+
+                processedAt:
+                    null,
+
+                failedAt:
+                    null,
+
+                attempts:
+                    0,
+
+                lastError:
+                    null,
+            };
+
+            const created =
+                await this
+                    .deliveryRepository
+                    .create(
+                        delivery,
+                    );
+
+            if (!created) {
+                delivery =
+                    await this
+                        .deliveryRepository
+                        .findById(
+                            input
+                                .deliveryId,
+                        );
+
+                if (!delivery) {
+                    throw new ApiError(
+                        "DELIVERY_STATE_ERROR",
+                        "Webhook delivery state could not be resolved.",
+                        500,
+                    );
+                }
+
+                if (
+                    delivery.status ===
+                    "processed"
+                ) {
+                    return {
+                        ignored:
+                            false,
+
+                        duplicate:
+                            true,
+
+                        relayEventId:
+                            null,
+                    };
+                }
+            }
+        }
+
+        delivery.status =
+            "processing";
+
+        delivery.processingStartedAt =
+            now();
+
+        delivery.attempts += 1;
+
+        delivery.lastError =
+            null;
+
+        await this
+            .deliveryRepository
+            .save(
+                delivery,
+            );
+
+        try {
+            const result =
+                await this.processWebhook(
+                    input,
+                );
+
+            delivery.status =
+                "processed";
+
+            delivery.processedAt =
+                now();
+
+            delivery.failedAt =
+                null;
+
+            await this
+                .deliveryRepository
+                .save(
+                    delivery,
+                );
+
+            return result;
+        } catch (error) {
+            delivery.status =
+                "failed";
+
+            delivery.failedAt =
+                now();
+
+            delivery.lastError =
+                getErrorMessage(
+                    error,
+                );
+
+            await this
+                .deliveryRepository
+                .save(
+                    delivery,
+                );
+
+            throw error;
+        }
+    }
+
+    private async processWebhook(
+        input: HandleWebhookInput,
+    ): Promise<HandleWebhookResult> {
         if (
             input.event !==
             "pull_request"
         ) {
-            await this
-                .deliveryRepository
-                .markProcessed(
-                    input.deliveryId,
-                    now(),
-                );
-
             return {
                 ignored:
                     true,
@@ -124,13 +245,6 @@ export class GitHubWebhookService {
             input.payload.action !==
             "opened"
         ) {
-            await this
-                .deliveryRepository
-                .markProcessed(
-                    input.deliveryId,
-                    now(),
-                );
-
             return {
                 ignored:
                     true,
@@ -169,22 +283,11 @@ export class GitHubWebhookService {
                     repositoryId,
                 );
 
-        if (!connection) {
-            /*
-             * The GitHub App may receive events
-             * for an installation/repository
-             * that is not associated with
-             * an active Orbit Local connection.
-             *
-             * This is not a webhook failure.
-             */
-            await this
-                .deliveryRepository
-                .markProcessed(
-                    input.deliveryId,
-                    now(),
-                );
-
+        if (
+            !connection ||
+            connection.status !==
+            "connected"
+        ) {
             return {
                 ignored:
                     true,
@@ -197,26 +300,24 @@ export class GitHubWebhookService {
             };
         }
 
-        if (
-            connection.status !==
-            "connected"
-        ) {
+        const existing =
             await this
-                .deliveryRepository
-                .markProcessed(
+                .eventRepository
+                .findByDeliveryId(
+                    connection.id,
                     input.deliveryId,
-                    now(),
                 );
 
+        if (existing) {
             return {
                 ignored:
-                    true,
-
-                duplicate:
                     false,
 
+                duplicate:
+                    true,
+
                 relayEventId:
-                    null,
+                existing.id,
             };
         }
 
@@ -241,15 +342,15 @@ export class GitHubWebhookService {
 
             repositoryId,
 
-            pullRequestNumber:
-            input.payload
-                .pull_request
-                .number,
-
             pullRequestId:
             input.payload
                 .pull_request
                 .id,
+
+            pullRequestNumber:
+            input.payload
+                .pull_request
+                .number,
 
             pullRequestUrl:
             input.payload
@@ -273,13 +374,6 @@ export class GitHubWebhookService {
             .eventRepository
             .create(
                 relayEvent,
-            );
-
-        await this
-            .deliveryRepository
-            .markProcessed(
-                input.deliveryId,
-                now(),
             );
 
         return {

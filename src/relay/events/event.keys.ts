@@ -6,6 +6,13 @@ export const eventKeys = {
         return `events/${connectionId}/${eventId}`;
     },
 
+    byDelivery(
+        connectionId: string,
+        deliveryId: string,
+    ): string {
+        return `event-delivery/${connectionId}/${deliveryId}`;
+    },
+
     prefix(
         connectionId: string,
     ): string {
