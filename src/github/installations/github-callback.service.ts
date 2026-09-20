@@ -120,7 +120,13 @@ export class GitHubCallbackService {
 
         await this
             .connectionRepository
-            .save(connection);
+            .save(connection)
+
+        await this
+            .connectionRepository
+            .removeStateLookup(
+                connection.stateHash,
+            );
 
         return toConnectionDto(
             connection,

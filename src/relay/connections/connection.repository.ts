@@ -209,4 +209,17 @@ export class ConnectionRepository {
             ),
         );
     }
+
+    public async removeStateLookup(
+        stateHash: string,
+    ): Promise<void> {
+        const store =
+            getOrbitStore();
+
+        await store.delete(
+            connectionKeys.byStateHash(
+                stateHash,
+            ),
+        );
+    }
 }

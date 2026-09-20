@@ -19,4 +19,7 @@ export class InstallationTokenService {
             },
         );
     }
+
+    // TODO: Cache installation access tokens until shortly before expiry
+    // if GitHub API traffic becomes high enough to justify it.
 }
