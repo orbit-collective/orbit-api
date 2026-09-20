@@ -175,4 +175,38 @@ export class ConnectionRepository {
             );
         }
     }
+
+    public async replaceTokenLookup(
+        connection: GitHubConnection,
+        oldTokenHash: string,
+    ): Promise<void> {
+        const store =
+            getOrbitStore();
+
+        await store.setJSON(
+            connectionKeys.byId(
+                connection.id,
+            ),
+            connection,
+        );
+
+        await store.setJSON(
+            connectionKeys.byTokenHash(
+                connection.tokenHash,
+            ),
+            {
+                connectionId:
+                connection.id,
+            },
+            {
+                onlyIfNew: true,
+            },
+        );
+
+        await store.delete(
+            connectionKeys.byTokenHash(
+                oldTokenHash,
+            ),
+        );
+    }
 }
