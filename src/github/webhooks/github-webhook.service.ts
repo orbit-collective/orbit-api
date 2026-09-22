@@ -231,6 +231,14 @@ export class GitHubWebhookService {
             input.event !==
             "pull_request"
         ) {
+            console.log(
+                "GitHub webhook ignored: unsupported event type",
+                {
+                    deliveryId: input.deliveryId,
+                    event: input.event,
+                },
+            );
+
             return {
                 ignored:
                     true,
@@ -247,6 +255,14 @@ export class GitHubWebhookService {
             input.payload.action !==
             "opened"
         ) {
+            console.log(
+                "GitHub webhook ignored: unsupported action",
+                {
+                    deliveryId: input.deliveryId,
+                    action: input.payload.action ?? null,
+                },
+            );
+
             return {
                 ignored:
                     true,
@@ -290,6 +306,15 @@ export class GitHubWebhookService {
             connection.status !==
             "connected"
         ) {
+            console.log(
+                "GitHub webhook ignored: no connected connection for this repository",
+                {
+                    deliveryId: input.deliveryId,
+                    installationId,
+                    repositoryId,
+                },
+            );
+
             return {
                 ignored:
                     true,
@@ -379,6 +404,15 @@ export class GitHubWebhookService {
             .create(
                 relayEvent,
             );
+
+        console.log(
+            "GitHub relay event created",
+            {
+                deliveryId: input.deliveryId,
+                connectionId: connection.id,
+                relayEventId: relayEvent.id,
+            },
+        );
 
         return {
             ignored:

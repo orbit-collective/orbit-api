@@ -126,6 +126,14 @@ export class CommentService {
                 );
 
         if (existing) {
+            console.log(
+                "GitHub comment duplicate prevented",
+                {
+                    connectionId: connection.id,
+                    eventId: input.eventId,
+                },
+            );
+
             return {
                 duplicate:
                     true,
@@ -216,6 +224,15 @@ export class CommentService {
                         connection.id,
                         event.id,
                     );
+
+            console.log(
+                "GitHub comment duplicate prevented",
+                {
+                    connectionId: connection.id,
+                    eventId: input.eventId,
+                    race: true,
+                },
+            );
 
             return {
                 duplicate:
