@@ -27,6 +27,14 @@ export interface GitHubRelayEvent {
 
     pullRequestBody: string;
 
+    pullRequestTitle: string;
+
+    pullRequestSourceBranch: string;
+
+    pullRequestTargetBranch: string;
+
+    pullRequestDraft: boolean;
+
     createdAt: string;
 
     processedAt: string | null;

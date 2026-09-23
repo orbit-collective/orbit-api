@@ -19,6 +19,10 @@ export interface GitHubRelayEventDto {
         number: number;
         url: string;
         body: string;
+        title: string;
+        sourceBranch: string;
+        targetBranch: string;
+        draft: boolean;
     };
 
     createdAt: string;
@@ -57,6 +61,18 @@ export function toEventDto(
 
             body:
             event.pullRequestBody,
+
+            title:
+            event.pullRequestTitle,
+
+            sourceBranch:
+            event.pullRequestSourceBranch,
+
+            targetBranch:
+            event.pullRequestTargetBranch,
+
+            draft:
+            event.pullRequestDraft,
         },
 
         createdAt:

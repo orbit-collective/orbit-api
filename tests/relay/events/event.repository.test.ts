@@ -71,6 +71,18 @@ function createEvent(
         pullRequestBody:
             "body",
 
+        pullRequestTitle:
+            "Fix login redirect",
+
+        pullRequestSourceBranch:
+            "fix/login-redirect",
+
+        pullRequestTargetBranch:
+            "master",
+
+        pullRequestDraft:
+            false,
+
         createdAt:
             "2026-09-19T00:00:00.000Z",
 

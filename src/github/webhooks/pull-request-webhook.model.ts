@@ -22,8 +22,20 @@ export interface GitHubPullRequestWebhook {
 
         number: number;
 
+        title: string;
+
         body: string | null;
 
         html_url: string;
+
+        draft: boolean;
+
+        head: {
+            ref: string;
+        };
+
+        base: {
+            ref: string;
+        };
     };
 }

@@ -390,6 +390,28 @@ export class GitHubWebhookService {
                     .body ??
                 "",
 
+            pullRequestTitle:
+            input.payload
+                .pull_request
+                .title,
+
+            pullRequestSourceBranch:
+            input.payload
+                .pull_request
+                .head
+                .ref,
+
+            pullRequestTargetBranch:
+            input.payload
+                .pull_request
+                .base
+                .ref,
+
+            pullRequestDraft:
+            input.payload
+                .pull_request
+                .draft,
+
             createdAt:
                 now(),
 

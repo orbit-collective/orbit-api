@@ -87,11 +87,27 @@ function createPayload() {
             number:
                 283,
 
+            title:
+                "Fix login redirect",
+
             body:
                 "<!-- orbit-issue:213769 -->",
 
             html_url:
                 "https://github.com/orbit-collective/orbit/pull/283",
+
+            draft:
+                false,
+
+            head: {
+                ref:
+                    "fix/login-redirect",
+            },
+
+            base: {
+                ref:
+                    "master",
+            },
         },
     };
 }
