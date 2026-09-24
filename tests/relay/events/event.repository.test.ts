@@ -83,6 +83,18 @@ function createEvent(
         pullRequestDraft:
             false,
 
+        pullRequestState:
+            "open",
+
+        pullRequestMerged:
+            false,
+
+        pullRequestMergedAt:
+            null,
+
+        pullRequestUpdatedAt:
+            "2026-09-19T00:00:00.000Z",
+
         createdAt:
             "2026-09-19T00:00:00.000Z",
 

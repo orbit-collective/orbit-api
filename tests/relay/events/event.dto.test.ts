@@ -65,6 +65,18 @@ describe(
                     pullRequestDraft:
                         false,
 
+                    pullRequestState:
+                        "open",
+
+                    pullRequestMerged:
+                        false,
+
+                    pullRequestMergedAt:
+                        null,
+
+                    pullRequestUpdatedAt:
+                        "2026-09-19T00:00:00.000Z",
+
                     createdAt:
                         "2026-09-19T00:00:00.000Z",
 
@@ -124,6 +136,18 @@ describe(
 
                         draft:
                             false,
+
+                        state:
+                            "open",
+
+                        merged:
+                            false,
+
+                        mergedAt:
+                            null,
+
+                        updatedAt:
+                            "2026-09-19T00:00:00.000Z",
                     },
 
                     createdAt:
@@ -181,6 +205,18 @@ describe(
 
                     pullRequestDraft:
                         false,
+
+                    pullRequestState:
+                        "open",
+
+                    pullRequestMerged:
+                        false,
+
+                    pullRequestMergedAt:
+                        null,
+
+                    pullRequestUpdatedAt:
+                        "2026-09-19T00:00:00.000Z",
 
                     createdAt:
                         "2026-09-19T00:00:00.000Z",

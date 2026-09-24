@@ -13,6 +13,10 @@ import type {
     GitHubConnection,
 } from "@/relay/connections/connection.model";
 
+import type {
+    GitHubPullRequestWebhook,
+} from "@/github/webhooks/pull-request-webhook.model";
+
 function createConnection():
     GitHubConnection {
     return {
@@ -54,7 +58,7 @@ function createConnection():
     };
 }
 
-function createPayload() {
+function createPayload(): GitHubPullRequestWebhook {
     return {
         action:
             "opened",
@@ -98,6 +102,18 @@ function createPayload() {
 
             draft:
                 false,
+
+            state:
+                "open",
+
+            merged:
+                false,
+
+            merged_at:
+                null,
+
+            updated_at:
+                "2026-09-19T00:00:00.000Z",
 
             head: {
                 ref:
@@ -215,7 +231,7 @@ describe(
         );
 
         it(
-            "ignores pull request actions other than opened",
+            "ignores pull request actions outside the supported lifecycle set",
             async () => {
                 const deliveryRepository = {
                     findById:
@@ -254,7 +270,7 @@ describe(
                     createPayload();
 
                 payload.action =
-                    "closed";
+                    "edited";
 
                 const service =
                     new GitHubWebhookService(
@@ -281,6 +297,280 @@ describe(
                 expect(
                     eventRepository.create,
                 ).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each([
+            "reopened",
+            "closed",
+            "synchronize",
+        ] as const)(
+            "creates a relay event for a %s action",
+            async (action) => {
+                const deliveryRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                true,
+                            ),
+
+                    save:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const connectionRepository = {
+                    findByRepository:
+                        vi.fn()
+                            .mockResolvedValue(
+                                createConnection(),
+                            ),
+                };
+
+                const eventRepository = {
+                    findByDeliveryId:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const payload =
+                    createPayload();
+
+                payload.action =
+                    action;
+
+                const service =
+                    new GitHubWebhookService(
+                        deliveryRepository as never,
+                        connectionRepository as never,
+                        eventRepository as never,
+                    );
+
+                const result =
+                    await service.handle({
+                        deliveryId:
+                            "delivery-lifecycle",
+
+                        event:
+                            "pull_request",
+
+                        payload,
+                    });
+
+                expect(
+                    result.ignored,
+                ).toBe(false);
+
+                expect(
+                    eventRepository.create,
+                ).toHaveBeenCalledOnce();
+
+                const createdEvent =
+                    eventRepository
+                        .create
+                        .mock
+                        .calls[0]
+                        ?.[0];
+
+                expect(
+                    createdEvent.action,
+                ).toBe(action);
+            },
+        );
+
+        it(
+            "marks a closed unmerged pull request event with merged false",
+            async () => {
+                const deliveryRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                true,
+                            ),
+
+                    save:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const connectionRepository = {
+                    findByRepository:
+                        vi.fn()
+                            .mockResolvedValue(
+                                createConnection(),
+                            ),
+                };
+
+                const eventRepository = {
+                    findByDeliveryId:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const payload =
+                    createPayload();
+
+                payload.action =
+                    "closed";
+
+                payload.pull_request.merged =
+                    false;
+
+                const service =
+                    new GitHubWebhookService(
+                        deliveryRepository as never,
+                        connectionRepository as never,
+                        eventRepository as never,
+                    );
+
+                await service.handle({
+                    deliveryId:
+                        "delivery-closed-unmerged",
+
+                    event:
+                        "pull_request",
+
+                    payload,
+                });
+
+                const createdEvent =
+                    eventRepository
+                        .create
+                        .mock
+                        .calls[0]
+                        ?.[0];
+
+                expect(
+                    createdEvent
+                        .pullRequestMerged,
+                ).toBe(false);
+            },
+        );
+
+        it(
+            "marks a closed merged pull request event with merged true",
+            async () => {
+                const deliveryRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                true,
+                            ),
+
+                    save:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const connectionRepository = {
+                    findByRepository:
+                        vi.fn()
+                            .mockResolvedValue(
+                                createConnection(),
+                            ),
+                };
+
+                const eventRepository = {
+                    findByDeliveryId:
+                        vi.fn()
+                            .mockResolvedValue(
+                                null,
+                            ),
+
+                    create:
+                        vi.fn()
+                            .mockResolvedValue(
+                                undefined,
+                            ),
+                };
+
+                const payload =
+                    createPayload();
+
+                payload.action =
+                    "closed";
+
+                payload.pull_request.merged =
+                    true;
+
+                payload.pull_request.merged_at =
+                    "2026-09-24T00:00:00.000Z";
+
+                const service =
+                    new GitHubWebhookService(
+                        deliveryRepository as never,
+                        connectionRepository as never,
+                        eventRepository as never,
+                    );
+
+                await service.handle({
+                    deliveryId:
+                        "delivery-closed-merged",
+
+                    event:
+                        "pull_request",
+
+                    payload,
+                });
+
+                const createdEvent =
+                    eventRepository
+                        .create
+                        .mock
+                        .calls[0]
+                        ?.[0];
+
+                expect(
+                    createdEvent
+                        .pullRequestMerged,
+                ).toBe(true);
+
+                expect(
+                    createdEvent
+                        .pullRequestMergedAt,
+                ).toBe(
+                    "2026-09-24T00:00:00.000Z",
+                );
             },
         );
 
