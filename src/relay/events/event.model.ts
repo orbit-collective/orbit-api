@@ -2,7 +2,10 @@ export type RelayEventType =
     | "pull_request";
 
 export type RelayEventAction =
-    | "opened";
+    | "opened"
+    | "reopened"
+    | "closed"
+    | "synchronize";
 
 export interface GitHubRelayEvent {
     id: string;
@@ -34,6 +37,14 @@ export interface GitHubRelayEvent {
     pullRequestTargetBranch: string;
 
     pullRequestDraft: boolean;
+
+    pullRequestState: string;
+
+    pullRequestMerged: boolean;
+
+    pullRequestMergedAt: string | null;
+
+    pullRequestUpdatedAt: string;
 
     createdAt: string;
 

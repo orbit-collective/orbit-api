@@ -30,6 +30,14 @@ export interface GitHubPullRequestWebhook {
 
         draft: boolean;
 
+        state: string;
+
+        merged: boolean;
+
+        merged_at: string | null;
+
+        updated_at: string;
+
         head: {
             ref: string;
         };

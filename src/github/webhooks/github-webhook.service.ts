@@ -34,7 +34,19 @@ import type {
     GitHubPullRequestWebhook,
 } from "./pull-request-webhook.model";
 
+import type {
+    RelayEventAction,
+} from "@/relay/events/event.model";
+
 const EVENT_TTL_HOURS = 24;
+
+const SUPPORTED_ACTIONS:
+    RelayEventAction[] = [
+    "opened",
+    "reopened",
+    "closed",
+    "synchronize",
+];
 
 export interface HandleWebhookInput {
     deliveryId: string;
@@ -252,8 +264,9 @@ export class GitHubWebhookService {
         }
 
         if (
-            input.payload.action !==
-            "opened"
+            !SUPPORTED_ACTIONS.includes(
+                input.payload.action as RelayEventAction,
+            )
         ) {
             console.log(
                 "GitHub webhook ignored: unsupported action",
@@ -363,7 +376,8 @@ export class GitHubWebhookService {
                 "pull_request",
 
             action:
-                "opened",
+            input.payload
+                .action as RelayEventAction,
 
             installationId,
 
@@ -411,6 +425,26 @@ export class GitHubWebhookService {
             input.payload
                 .pull_request
                 .draft,
+
+            pullRequestState:
+            input.payload
+                .pull_request
+                .state,
+
+            pullRequestMerged:
+            input.payload
+                .pull_request
+                .merged,
+
+            pullRequestMergedAt:
+            input.payload
+                .pull_request
+                .merged_at,
+
+            pullRequestUpdatedAt:
+            input.payload
+                .pull_request
+                .updated_at,
 
             createdAt:
                 now(),

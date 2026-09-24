@@ -1,12 +1,13 @@
 import type {
     GitHubRelayEvent,
+    RelayEventAction,
 } from "./event.model";
 
 export interface GitHubRelayEventDto {
     id: string;
 
     type: "pull_request";
-    action: "opened";
+    action: RelayEventAction;
 
     deliveryId: string;
 
@@ -23,6 +24,10 @@ export interface GitHubRelayEventDto {
         sourceBranch: string;
         targetBranch: string;
         draft: boolean;
+        state: string;
+        merged: boolean;
+        mergedAt: string | null;
+        updatedAt: string;
     };
 
     createdAt: string;
@@ -73,6 +78,18 @@ export function toEventDto(
 
             draft:
             event.pullRequestDraft,
+
+            state:
+            event.pullRequestState,
+
+            merged:
+            event.pullRequestMerged,
+
+            mergedAt:
+            event.pullRequestMergedAt,
+
+            updatedAt:
+            event.pullRequestUpdatedAt,
         },
 
         createdAt:
