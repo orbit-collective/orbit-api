@@ -98,12 +98,17 @@ let connectionRepository: {
         ReturnType<typeof vi.fn>;
 };
 
+let repositoryRepository: {
+    create: ReturnType<typeof vi.fn>;
+};
+
 function createService() {
     return new GitHubCallbackService(
         stateService as never,
         oauthService as never,
         installationService as never,
         connectionRepository as never,
+        repositoryRepository as never,
     );
 }
 
@@ -150,6 +155,14 @@ beforeEach(
                     ),
 
             removeStateLookup:
+                vi.fn()
+                    .mockResolvedValue(
+                        undefined,
+                    ),
+        };
+
+        repositoryRepository = {
+            create:
                 vi.fn()
                     .mockResolvedValue(
                         undefined,
@@ -261,7 +274,7 @@ describe(
         );
 
         it(
-            "rejects an installation with several repositories",
+            "persists every selected repository and mirrors the first onto the connection",
             async () => {
                 installationService
                     .listRepositories
@@ -274,19 +287,29 @@ describe(
                         ),
                     ]);
 
-                await expect(
-                    createService()
+                const dto =
+                    await createService()
                         .handle(
                             "code",
                             "state",
                             123,
-                        ),
-                ).rejects.toMatchObject({
-                    code:
-                        "MULTIPLE_REPOSITORIES_SELECTED",
+                        );
 
-                    status: 400,
-                });
+                expect(
+                    dto.repositories,
+                ).toHaveLength(2);
+
+                expect(
+                    repositoryRepository
+                        .create,
+                ).toHaveBeenCalledTimes(
+                    2,
+                );
+
+                expect(
+                    connection
+                        .repositoryId,
+                ).toBe(1);
             },
         );
 

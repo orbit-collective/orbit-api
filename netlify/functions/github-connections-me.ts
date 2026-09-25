@@ -9,6 +9,9 @@ import {
     toConnectionDto,
 } from "@/relay/connections/connection.dto";
 import {
+    RepositoryService,
+} from "@/relay/repositories/repository.service";
+import {
     handleRequest,
 } from "@/shared/errors";
 import {
@@ -45,9 +48,19 @@ export default async function handler(
                         request,
                     );
 
+            const repositoryService =
+                new RepositoryService();
+
+            const repositories =
+                await repositoryService
+                    .listForConnection(
+                        connection,
+                    );
+
             return success(
                 toConnectionDto(
                     connection,
+                    repositories,
                 ),
             );
         },

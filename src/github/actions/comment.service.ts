@@ -23,6 +23,10 @@ import type {
 } from "@/relay/connections/connection.model";
 
 import {
+    RepositoryService,
+} from "@/relay/repositories/repository.service";
+
+import {
     CommentRepository,
 } from "./comment.repository";
 
@@ -47,6 +51,9 @@ export class CommentService {
 
         private readonly githubCommentClient =
         new GitHubCommentClient(),
+
+        private readonly repositoryService =
+        new RepositoryService(),
     ) {}
 
     public async create(
@@ -66,12 +73,6 @@ export class CommentService {
 
         if (
             connection.installationId ===
-            null ||
-            connection.repositoryId ===
-            null ||
-            connection.repositoryOwner ===
-            null ||
-            connection.repositoryName ===
             null
         ) {
             throw new ApiError(
@@ -96,13 +97,23 @@ export class CommentService {
             );
         }
 
-        if (
-            event.repositoryId !==
-            connection.repositoryId
-        ) {
+        const repositories =
+            await this.repositoryService
+                .listForConnection(
+                    connection,
+                );
+
+        const repository =
+            repositories.find(
+                (candidate) =>
+                    candidate.repositoryId ===
+                    event.repositoryId,
+            );
+
+        if (!repository) {
             throw new ApiError(
                 "EVENT_REPOSITORY_MISMATCH",
-                "Relay event does not belong to the connected repository.",
+                "Relay event does not belong to a repository connected to this project.",
                 403,
             );
         }
@@ -165,11 +176,9 @@ export class CommentService {
                     installationToken
                         .token,
 
-                    connection
-                        .repositoryOwner,
+                    repository.owner,
 
-                    connection
-                        .repositoryName,
+                    repository.name,
 
                     input
                         .pullRequestNumber,

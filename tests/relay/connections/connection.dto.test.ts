@@ -35,7 +35,7 @@ describe("toConnectionDto", () => {
         );
     });
 
-    it("returns null repository for pending connection", () => {
+    it("returns an empty repository list for a pending connection", () => {
         const {
             connection,
         } = createConnection();
@@ -46,11 +46,53 @@ describe("toConnectionDto", () => {
             );
 
         expect(
-            dto.repository,
-        ).toBeNull();
+            dto.repositories,
+        ).toEqual([]);
 
         expect(
             dto.status,
         ).toBe("pending");
+    });
+
+    it("maps every repository passed in", () => {
+        const {
+            connection,
+        } = createConnection();
+
+        const dto =
+            toConnectionDto(
+                connection,
+                [
+                    {
+                        connectionId:
+                        connection.id,
+
+                        installationId:
+                            123,
+
+                        repositoryId:
+                            456,
+
+                        owner:
+                            "orbit-collective",
+
+                        name:
+                            "orbit",
+
+                        addedAt:
+                            "2026-09-24T00:00:00.000Z",
+                    },
+                ],
+            );
+
+        expect(
+            dto.repositories,
+        ).toEqual([
+            {
+                id: 456,
+                owner: "orbit-collective",
+                name: "orbit",
+            },
+        ]);
     });
 });

@@ -186,12 +186,30 @@ describe(
                             }),
                 };
 
+                const repositoryService = {
+                    listForConnection:
+                        vi.fn()
+                            .mockResolvedValue([
+                                {
+                                    repositoryId:
+                                        456,
+
+                                    owner:
+                                        "orbit-collective",
+
+                                    name:
+                                        "orbit",
+                                },
+                            ]),
+                };
+
                 const service =
                     new CommentService(
                         eventRepository as never,
                         commentRepository as never,
                         tokenService as never,
                         githubClient as never,
+                        repositoryService as never,
                     );
 
                 const result =
@@ -261,12 +279,30 @@ describe(
                         vi.fn(),
                 };
 
+                const repositoryService = {
+                    listForConnection:
+                        vi.fn()
+                            .mockResolvedValue([
+                                {
+                                    repositoryId:
+                                        456,
+
+                                    owner:
+                                        "orbit-collective",
+
+                                    name:
+                                        "orbit",
+                                },
+                            ]),
+                };
+
                 const service =
                     new CommentService(
                         eventRepository as never,
                         commentRepository as never,
                         tokenService as never,
                         githubClient as never,
+                        repositoryService as never,
                     );
 
                 const result =
@@ -323,12 +359,30 @@ describe(
                         vi.fn(),
                 };
 
+                const repositoryService = {
+                    listForConnection:
+                        vi.fn()
+                            .mockResolvedValue([
+                                {
+                                    repositoryId:
+                                        456,
+
+                                    owner:
+                                        "orbit-collective",
+
+                                    name:
+                                        "orbit",
+                                },
+                            ]),
+                };
+
                 const service =
                     new CommentService(
                         eventRepository as never,
                         commentRepository as never,
                         tokenService as never,
                         githubClient as never,
+                        repositoryService as never,
                     );
 
                 await expect(
@@ -347,6 +401,74 @@ describe(
                     ),
                 ).rejects.toThrow(
                     "Pull request number does not match the relay event.",
+                );
+
+                expect(
+                    githubClient.create,
+                ).not.toHaveBeenCalled();
+            },
+        );
+
+        it(
+            "rejects an event whose repository is not connected to this project",
+            async () => {
+                const eventRepository = {
+                    findById:
+                        vi.fn()
+                            .mockResolvedValue(
+                                event(),
+                            ),
+                };
+
+                const commentRepository = {
+                    findByEvent:
+                        vi.fn(),
+
+                    create:
+                        vi.fn(),
+                };
+
+                const tokenService = {
+                    create:
+                        vi.fn(),
+                };
+
+                const githubClient = {
+                    create:
+                        vi.fn(),
+                };
+
+                const repositoryService = {
+                    listForConnection:
+                        vi.fn()
+                            .mockResolvedValue([]),
+                };
+
+                const service =
+                    new CommentService(
+                        eventRepository as never,
+                        commentRepository as never,
+                        tokenService as never,
+                        githubClient as never,
+                        repositoryService as never,
+                    );
+
+                await expect(
+                    service.create(
+                        connection(),
+                        {
+                            eventId:
+                                "event-1",
+
+                            pullRequestNumber:
+                                283,
+
+                            body:
+                                "test",
+                        },
+                    ),
+                ).rejects.toThrow(
+                    "Relay event does not belong to a repository connected to this project.",
                 );
 
                 expect(

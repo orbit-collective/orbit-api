@@ -49,7 +49,7 @@ describe(
         );
 
         it(
-            "pending connection has null GitHub repository",
+            "pending connection has no GitHub repositories",
             () => {
                 const {
                     connection,
@@ -68,8 +68,8 @@ describe(
                 );
 
                 expect(
-                    response.repository,
-                ).toBeNull();
+                    response.repositories,
+                ).toEqual([]);
             },
         );
     },

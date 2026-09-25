@@ -15,6 +15,10 @@ import {
 } from "@/relay/connections/connection.repository";
 
 import {
+    RepositoryRepository,
+} from "@/relay/repositories/repository.repository";
+
+import {
     ApiError,
 } from "@/shared/errors";
 
@@ -39,6 +43,9 @@ export class GitHubCallbackService {
 
         private readonly connectionRepository =
         new ConnectionRepository(),
+
+        private readonly repositoryRepository =
+        new RepositoryRepository(),
     ) {}
 
     public async handle(
@@ -78,21 +85,14 @@ export class GitHubCallbackService {
             );
         }
 
-        if (
-            repositories.length >
-            1
-        ) {
-            throw new ApiError(
-                "MULTIPLE_REPOSITORIES_SELECTED",
-                "GitHub Integration MVP supports exactly one repository per Orbit connection.",
-                400,
-            );
-        }
-
-        const repository =
+        // The primary/first repository is also mirrored onto the
+        // connection's own scalar fields, matching every connection
+        // created before multi-repository support - see
+        // RepositoryService's legacy fallback for why that still matters.
+        const primaryRepository =
             repositories[0];
 
-        if (!repository) {
+        if (!primaryRepository) {
             throw new ApiError(
                 "REPOSITORY_NOT_FOUND",
                 "Selected repository could not be resolved.",
@@ -107,13 +107,13 @@ export class GitHubCallbackService {
             installationId;
 
         connection.repositoryId =
-            repository.id;
+            primaryRepository.id;
 
         connection.repositoryOwner =
-            repository.owner.login;
+            primaryRepository.owner.login;
 
         connection.repositoryName =
-            repository.name;
+            primaryRepository.name;
 
         connection.connectedAt =
             now();
@@ -121,6 +121,30 @@ export class GitHubCallbackService {
         await this
             .connectionRepository
             .save(connection)
+
+        for (const repository of repositories) {
+            await this
+                .repositoryRepository
+                .create({
+                    connectionId:
+                    connection.id,
+
+                    installationId,
+
+                    repositoryId:
+                    repository.id,
+
+                    owner:
+                    repository.owner
+                        .login,
+
+                    name:
+                    repository.name,
+
+                    addedAt:
+                        connection.connectedAt,
+                });
+        }
 
         await this
             .connectionRepository
@@ -130,6 +154,27 @@ export class GitHubCallbackService {
 
         return toConnectionDto(
             connection,
+            repositories.map(
+                (repository) => ({
+                    connectionId:
+                    connection.id,
+
+                    installationId,
+
+                    repositoryId:
+                    repository.id,
+
+                    owner:
+                    repository.owner
+                        .login,
+
+                    name:
+                    repository.name,
+
+                    addedAt:
+                        connection.connectedAt as string,
+                }),
+            ),
         );
     }
 }

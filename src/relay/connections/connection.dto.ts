@@ -3,6 +3,10 @@ import type {
     GitHubConnectionStatus,
 } from "./connection.model";
 
+import type {
+    GitHubConnectionRepository,
+} from "@/relay/repositories/repository.model";
+
 export interface GitHubConnectionDto {
     id: string;
 
@@ -10,11 +14,11 @@ export interface GitHubConnectionDto {
 
     installationId: number | null;
 
-    repository: {
+    repositories: {
         id: number;
         owner: string;
         name: string;
-    } | null;
+    }[];
 
     createdAt: string;
 
@@ -25,20 +29,8 @@ export interface GitHubConnectionDto {
 
 export function toConnectionDto(
     connection: GitHubConnection,
+    repositories: GitHubConnectionRepository[] = [],
 ): GitHubConnectionDto {
-    const repository =
-        connection.repositoryId !== null &&
-        connection.repositoryOwner !== null &&
-        connection.repositoryName !== null
-            ? {
-                id: connection.repositoryId,
-                owner:
-                connection.repositoryOwner,
-                name:
-                connection.repositoryName,
-            }
-            : null;
-
     return {
         id: connection.id,
 
@@ -47,7 +39,14 @@ export function toConnectionDto(
         installationId:
         connection.installationId,
 
-        repository,
+        repositories:
+            repositories.map(
+                (repository) => ({
+                    id: repository.repositoryId,
+                    owner: repository.owner,
+                    name: repository.name,
+                }),
+            ),
 
         createdAt:
         connection.createdAt,
