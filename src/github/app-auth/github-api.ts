@@ -87,6 +87,7 @@ export async function githubRequest<T>(
             "GITHUB_API_ERROR",
             "GitHub API request failed.",
             502,
+            response.status,
         );
     }
 

@@ -55,3 +55,9 @@
   to = "/.netlify/functions/github-repositories"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/branches"
+  to = "/.netlify/functions/github-branches"
+  status = 200
+  force = true
