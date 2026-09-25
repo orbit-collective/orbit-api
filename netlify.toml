@@ -49,3 +49,9 @@
   to = "/.netlify/functions/github-comments"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/repositories"
+  to = "/.netlify/functions/github-repositories"
+  status = 200
+  force = true

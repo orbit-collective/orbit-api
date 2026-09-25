@@ -7,6 +7,11 @@ import type {
     GitHubConnectionRepository,
 } from "@/relay/repositories/repository.model";
 
+import {
+    toRepositoryDto,
+    type GitHubRepositoryDto,
+} from "@/relay/repositories/repository.dto";
+
 export interface GitHubConnectionDto {
     id: string;
 
@@ -14,11 +19,7 @@ export interface GitHubConnectionDto {
 
     installationId: number | null;
 
-    repositories: {
-        id: number;
-        owner: string;
-        name: string;
-    }[];
+    repositories: GitHubRepositoryDto[];
 
     createdAt: string;
 
@@ -41,11 +42,7 @@ export function toConnectionDto(
 
         repositories:
             repositories.map(
-                (repository) => ({
-                    id: repository.repositoryId,
-                    owner: repository.owner,
-                    name: repository.name,
-                }),
+                toRepositoryDto,
             ),
 
         createdAt:
