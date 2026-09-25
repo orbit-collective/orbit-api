@@ -141,4 +141,26 @@ describe("RepositoryService", () => {
             "This repository is not connected to this project.",
         );
     });
+
+    it("lists installation repositories not yet connected as available", async () => {
+        listRepositoriesMock.mockResolvedValue([
+            { id: 456, name: "orbit", full_name: "orbit-collective/orbit", owner: { login: "orbit-collective" } },
+            { id: 789, name: "orbit-api", full_name: "orbit-collective/orbit-api", owner: { login: "orbit-collective" } },
+        ]);
+
+        const available = await service.listAvailableForConnection(createConnection());
+
+        expect(available).toEqual([
+            { id: 789, owner: "orbit-collective", name: "orbit-api" },
+        ]);
+    });
+
+    it("returns no available repositories for a connection with no installation", async () => {
+        const available = await service.listAvailableForConnection(
+            createConnection({ installationId: null }),
+        );
+
+        expect(available).toEqual([]);
+        expect(listRepositoriesMock).not.toHaveBeenCalled();
+    });
 });

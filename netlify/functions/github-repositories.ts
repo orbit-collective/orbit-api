@@ -72,17 +72,26 @@ export default async function handler(
                 request.method ===
                 "GET"
             ) {
-                const repositories =
-                    await repositoryService
-                        .listForConnection(
-                            connection,
-                        );
+                const [repositories, available] =
+                    await Promise.all([
+                        repositoryService
+                            .listForConnection(
+                                connection,
+                            ),
+
+                        repositoryService
+                            .listAvailableForConnection(
+                                connection,
+                            ),
+                    ]);
 
                 return success({
                     repositories:
                         repositories.map(
                             toRepositoryDto,
                         ),
+
+                    available,
                 });
             }
 

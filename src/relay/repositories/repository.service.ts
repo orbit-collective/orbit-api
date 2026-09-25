@@ -26,6 +26,10 @@ import type {
     GitHubConnectionRepository,
 } from "./repository.model";
 
+import type {
+    GitHubRepositoryDto,
+} from "./repository.dto";
+
 export class RepositoryService {
     public constructor(
         private readonly repositoryRepository =
@@ -64,6 +68,52 @@ export class RepositoryService {
         return this.legacyRepositoryOf(
             connection,
         );
+    }
+
+    /**
+     * The installation's own repositories that aren't already connected to
+     * this connection - what the "Add repository" picker in Orbit Local
+     * offers, so a caller never has to already know a repository's numeric
+     * id to add it.
+     */
+    public async listAvailableForConnection(
+        connection: GitHubConnection,
+    ): Promise<GitHubRepositoryDto[]> {
+        if (connection.installationId === null) {
+            return [];
+        }
+
+        const [connected, installationRepositories] =
+            await Promise.all([
+                this.listForConnection(
+                    connection,
+                ),
+
+                this.installationService
+                    .listRepositories(
+                        connection.installationId,
+                    ),
+            ]);
+
+        const connectedIds = new Set(
+            connected.map(
+                (repository) =>
+                    repository.repositoryId,
+            ),
+        );
+
+        return installationRepositories
+            .filter(
+                (repository) =>
+                    !connectedIds.has(
+                        repository.id,
+                    ),
+            )
+            .map((repository) => ({
+                id: repository.id,
+                owner: repository.owner.login,
+                name: repository.name,
+            }));
     }
 
     /**
