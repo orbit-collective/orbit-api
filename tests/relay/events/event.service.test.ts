@@ -121,8 +121,7 @@ describe(
 
                 expect(
                     result[0]
-                        ?.pullRequest
-                        .number,
+                        ?.pullRequestNumber,
                 ).toBe(42);
             },
         );

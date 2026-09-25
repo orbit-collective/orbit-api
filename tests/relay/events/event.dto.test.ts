@@ -112,13 +112,13 @@ describe(
                             456,
                     },
 
+                    pullRequestId:
+                        789,
+
+                    pullRequestNumber:
+                        42,
+
                     pullRequest: {
-                        id:
-                            789,
-
-                        number:
-                            42,
-
                         url:
                             "https://github.com/orbit-collective/orbit/pull/42",
 
@@ -153,6 +153,64 @@ describe(
                     createdAt:
                         "2026-09-19T00:00:00.000Z",
                 });
+            },
+        );
+
+        it(
+            "returns a check-status shape for a check_suite event without any pull_request metadata",
+            () => {
+                const event: GitHubRelayEvent = {
+                    id: "event-2",
+                    connectionId: "connection-1",
+                    deliveryId: "delivery-2",
+                    type: "check_suite",
+                    action: "completed",
+                    installationId: 123,
+                    repositoryId: 456,
+                    pullRequestId: 789,
+                    pullRequestNumber: 42,
+                    checkStatus: "passed",
+                    createdAt: "2026-09-19T00:00:00.000Z",
+                    processedAt: null,
+                    expiresAt: "2099-01-01T00:00:00.000Z",
+                };
+
+                const dto = toEventDto(event);
+
+                expect(dto.check).toEqual({ status: "passed" });
+                expect(dto).not.toHaveProperty("pullRequest");
+                expect(dto).not.toHaveProperty("review");
+            },
+        );
+
+        it(
+            "returns a review shape for a pull_request_review event",
+            () => {
+                const event: GitHubRelayEvent = {
+                    id: "event-3",
+                    connectionId: "connection-1",
+                    deliveryId: "delivery-3",
+                    type: "pull_request_review",
+                    action: "submitted",
+                    installationId: 123,
+                    repositoryId: 456,
+                    pullRequestId: 789,
+                    pullRequestNumber: 42,
+                    reviewState: "approved",
+                    reviewerLogin: "octocat",
+                    createdAt: "2026-09-19T00:00:00.000Z",
+                    processedAt: null,
+                    expiresAt: "2099-01-01T00:00:00.000Z",
+                };
+
+                const dto = toEventDto(event);
+
+                expect(dto.review).toEqual({
+                    state: "approved",
+                    reviewerLogin: "octocat",
+                });
+                expect(dto).not.toHaveProperty("pullRequest");
+                expect(dto).not.toHaveProperty("check");
             },
         );
 

@@ -1,12 +1,15 @@
 import type {
+    GitHubCheckStatus,
     GitHubRelayEvent,
+    GitHubReviewState,
     RelayEventAction,
+    RelayEventType,
 } from "./event.model";
 
 export interface GitHubRelayEventDto {
     id: string;
 
-    type: "pull_request";
+    type: RelayEventType;
     action: RelayEventAction;
 
     deliveryId: string;
@@ -15,9 +18,11 @@ export interface GitHubRelayEventDto {
         id: number;
     };
 
-    pullRequest: {
-        id: number;
-        number: number;
+    pullRequestId: number;
+    pullRequestNumber: number;
+
+    /** Only present for `type: "pull_request"`. */
+    pullRequest?: {
         url: string;
         body: string;
         title: string;
@@ -28,6 +33,17 @@ export interface GitHubRelayEventDto {
         merged: boolean;
         mergedAt: string | null;
         updatedAt: string;
+    };
+
+    /** Only present for `type: "check_suite"`. */
+    check?: {
+        status: GitHubCheckStatus;
+    };
+
+    /** Only present for `type: "pull_request_review"`. */
+    review?: {
+        state: GitHubReviewState;
+        reviewerLogin: string;
     };
 
     createdAt: string;
@@ -54,43 +70,70 @@ export function toEventDto(
             event.repositoryId,
         },
 
-        pullRequest: {
-            id:
-            event.pullRequestId,
+        pullRequestId:
+        event.pullRequestId,
 
-            number:
-            event.pullRequestNumber,
+        pullRequestNumber:
+        event.pullRequestNumber,
 
-            url:
-            event.pullRequestUrl,
+        ...(event.type ===
+            "pull_request" && {
+            pullRequest: {
+                url:
+                event.pullRequestUrl as string,
 
-            body:
-            event.pullRequestBody,
+                body:
+                event.pullRequestBody as string,
 
-            title:
-            event.pullRequestTitle,
+                title:
+                event.pullRequestTitle as string,
 
-            sourceBranch:
-            event.pullRequestSourceBranch,
+                sourceBranch:
+                event.pullRequestSourceBranch as string,
 
-            targetBranch:
-            event.pullRequestTargetBranch,
+                targetBranch:
+                event.pullRequestTargetBranch as string,
 
-            draft:
-            event.pullRequestDraft,
+                draft:
+                event.pullRequestDraft as boolean,
 
-            state:
-            event.pullRequestState,
+                state:
+                event.pullRequestState as string,
 
-            merged:
-            event.pullRequestMerged,
+                merged:
+                event.pullRequestMerged as boolean,
 
-            mergedAt:
-            event.pullRequestMergedAt,
+                mergedAt:
+                event.pullRequestMergedAt ??
+                null,
 
-            updatedAt:
-            event.pullRequestUpdatedAt,
-        },
+                updatedAt:
+                event.pullRequestUpdatedAt as string,
+            },
+        }),
+
+        ...(event.type ===
+            "check_suite" &&
+            event.checkStatus !==
+            undefined && {
+            check: {
+                status:
+                event.checkStatus,
+            },
+        }),
+
+        ...(event.type ===
+            "pull_request_review" &&
+            event.reviewState !==
+            undefined && {
+            review: {
+                state:
+                event.reviewState,
+
+                reviewerLogin:
+                event.reviewerLogin as string,
+            },
+        }),
 
         createdAt:
         event.createdAt,

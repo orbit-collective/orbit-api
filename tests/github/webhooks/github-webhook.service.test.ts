@@ -17,6 +17,14 @@ import type {
     GitHubPullRequestWebhook,
 } from "@/github/webhooks/pull-request-webhook.model";
 
+import type {
+    GitHubCheckSuiteWebhook,
+} from "@/github/webhooks/check-suite-webhook.model";
+
+import type {
+    GitHubPullRequestReviewWebhook,
+} from "@/github/webhooks/pull-request-review-webhook.model";
+
 function createConnection():
     GitHubConnection {
     return {
@@ -876,5 +884,248 @@ describe(
                 ).not.toHaveBeenCalled();
             },
         );
+
+        it("creates a relay event for a completed, successful check_suite", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = {
+                findByRepository: vi.fn().mockResolvedValue(createConnection()),
+            };
+            const eventRepository = {
+                findByDeliveryId: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(undefined),
+            };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubCheckSuiteWebhook = {
+                action: "completed",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                check_suite: {
+                    status: "completed",
+                    conclusion: "success",
+                    pull_requests: [{ id: 999, number: 283 }],
+                },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-2",
+                event: "check_suite",
+                payload,
+            });
+
+            expect(result.ignored).toBe(false);
+            expect(eventRepository.create).toHaveBeenCalledOnce();
+
+            const createdEvent = eventRepository.create.mock.calls[0]?.[0];
+            expect(createdEvent.type).toBe("check_suite");
+            expect(createdEvent.checkStatus).toBe("passed");
+            expect(createdEvent.pullRequestNumber).toBe(283);
+        });
+
+        it("maps an in-progress check_suite to pending", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = {
+                findByRepository: vi.fn().mockResolvedValue(createConnection()),
+            };
+            const eventRepository = {
+                findByDeliveryId: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(undefined),
+            };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubCheckSuiteWebhook = {
+                action: "requested",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                check_suite: {
+                    status: "in_progress",
+                    conclusion: null,
+                    pull_requests: [{ id: 999, number: 283 }],
+                },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-3",
+                event: "check_suite",
+                payload,
+            });
+
+            expect(result.ignored).toBe(false);
+
+            const createdEvent = eventRepository.create.mock.calls[0]?.[0];
+            expect(createdEvent.checkStatus).toBe("pending");
+        });
+
+        it("maps a completed, failed check_suite to failed", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = {
+                findByRepository: vi.fn().mockResolvedValue(createConnection()),
+            };
+            const eventRepository = {
+                findByDeliveryId: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(undefined),
+            };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubCheckSuiteWebhook = {
+                action: "completed",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                check_suite: {
+                    status: "completed",
+                    conclusion: "failure",
+                    pull_requests: [{ id: 999, number: 283 }],
+                },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-4",
+                event: "check_suite",
+                payload,
+            });
+
+            expect(result.ignored).toBe(false);
+
+            const createdEvent = eventRepository.create.mock.calls[0]?.[0];
+            expect(createdEvent.checkStatus).toBe("failed");
+        });
+
+        it("ignores a check_suite with no linked pull request", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = { findByRepository: vi.fn() };
+            const eventRepository = { findByDeliveryId: vi.fn(), create: vi.fn() };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubCheckSuiteWebhook = {
+                action: "completed",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                check_suite: {
+                    status: "completed",
+                    conclusion: "success",
+                    pull_requests: [],
+                },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-5",
+                event: "check_suite",
+                payload,
+            });
+
+            expect(result.ignored).toBe(true);
+            expect(connectionRepository.findByRepository).not.toHaveBeenCalled();
+        });
+
+        it("creates a relay event for a submitted pull request review", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = {
+                findByRepository: vi.fn().mockResolvedValue(createConnection()),
+            };
+            const eventRepository = {
+                findByDeliveryId: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(undefined),
+            };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubPullRequestReviewWebhook = {
+                action: "submitted",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                pull_request: { id: 999, number: 283 },
+                review: { state: "approved", user: { login: "octocat" } },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-6",
+                event: "pull_request_review",
+                payload,
+            });
+
+            expect(result.ignored).toBe(false);
+
+            const createdEvent = eventRepository.create.mock.calls[0]?.[0];
+            expect(createdEvent.type).toBe("pull_request_review");
+            expect(createdEvent.reviewState).toBe("approved");
+            expect(createdEvent.reviewerLogin).toBe("octocat");
+        });
+
+        it("ignores a review action other than submitted", async () => {
+            const deliveryRepository = {
+                findById: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue(true),
+                save: vi.fn().mockResolvedValue(undefined),
+            };
+            const connectionRepository = { findByRepository: vi.fn() };
+            const eventRepository = { findByDeliveryId: vi.fn(), create: vi.fn() };
+
+            const service = new GitHubWebhookService(
+                deliveryRepository as never,
+                connectionRepository as never,
+                eventRepository as never,
+            );
+
+            const payload: GitHubPullRequestReviewWebhook = {
+                action: "dismissed",
+                installation: { id: 123 },
+                repository: { id: 456 },
+                pull_request: { id: 999, number: 283 },
+                review: { state: "approved", user: { login: "octocat" } },
+            };
+
+            const result = await service.handle({
+                deliveryId: "delivery-7",
+                event: "pull_request_review",
+                payload,
+            });
+
+            expect(result.ignored).toBe(true);
+            expect(connectionRepository.findByRepository).not.toHaveBeenCalled();
+        });
     },
 );

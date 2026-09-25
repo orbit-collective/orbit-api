@@ -14,6 +14,14 @@ import type {
     GitHubPullRequestWebhook,
 } from "@/github/webhooks/pull-request-webhook.model";
 
+import type {
+    GitHubCheckSuiteWebhook,
+} from "@/github/webhooks/check-suite-webhook.model";
+
+import type {
+    GitHubPullRequestReviewWebhook,
+} from "@/github/webhooks/pull-request-review-webhook.model";
+
 import {
     verifyGitHubWebhookSignature,
 } from "@/security/github-webhook-signature";
@@ -78,14 +86,18 @@ export default async function handler(
             }
 
             let payload:
-                GitHubPullRequestWebhook;
+                | GitHubPullRequestWebhook
+                | GitHubCheckSuiteWebhook
+                | GitHubPullRequestReviewWebhook;
 
             try {
                 payload =
                     JSON.parse(
                         rawBody,
                     ) as
-                        GitHubPullRequestWebhook;
+                        | GitHubPullRequestWebhook
+                        | GitHubCheckSuiteWebhook
+                        | GitHubPullRequestReviewWebhook;
             } catch {
                 throw new ApiError(
                     "INVALID_WEBHOOK_PAYLOAD",

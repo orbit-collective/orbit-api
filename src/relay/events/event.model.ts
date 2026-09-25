@@ -1,11 +1,25 @@
 export type RelayEventType =
-    | "pull_request";
+    | "pull_request"
+    | "check_suite"
+    | "pull_request_review";
 
 export type RelayEventAction =
     | "opened"
     | "reopened"
     | "closed"
-    | "synchronize";
+    | "synchronize"
+    | "completed"
+    | "submitted";
+
+export type GitHubCheckStatus =
+    | "pending"
+    | "passed"
+    | "failed";
+
+export type GitHubReviewState =
+    | "approved"
+    | "changes_requested"
+    | "commented";
 
 export interface GitHubRelayEvent {
     id: string;
@@ -26,25 +40,40 @@ export interface GitHubRelayEvent {
 
     pullRequestNumber: number;
 
-    pullRequestUrl: string;
+    /**
+     * The fields below are only ever populated for `type: "pull_request"` -
+     * a check_suite/pull_request_review event only needs the PR identity
+     * above to resolve which existing link it applies to (see
+     * GithubRelayEventProcessor.handleCheckSuite()/handleReviewSubmitted()
+     * on the Orbit Local side), never a full copy of the PR's own metadata.
+     */
+    pullRequestUrl?: string;
 
-    pullRequestBody: string;
+    pullRequestBody?: string;
 
-    pullRequestTitle: string;
+    pullRequestTitle?: string;
 
-    pullRequestSourceBranch: string;
+    pullRequestSourceBranch?: string;
 
-    pullRequestTargetBranch: string;
+    pullRequestTargetBranch?: string;
 
-    pullRequestDraft: boolean;
+    pullRequestDraft?: boolean;
 
-    pullRequestState: string;
+    pullRequestState?: string;
 
-    pullRequestMerged: boolean;
+    pullRequestMerged?: boolean;
 
-    pullRequestMergedAt: string | null;
+    pullRequestMergedAt?: string | null;
 
-    pullRequestUpdatedAt: string;
+    pullRequestUpdatedAt?: string;
+
+    /** Only for `type: "check_suite"` - GitHub's own conclusion, reduced to three states (see GithubRelayEventProcessor for the mapping). */
+    checkStatus?: GitHubCheckStatus;
+
+    /** Only for `type: "pull_request_review"`. */
+    reviewState?: GitHubReviewState;
+
+    reviewerLogin?: string;
 
     createdAt: string;
 
