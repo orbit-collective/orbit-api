@@ -74,20 +74,44 @@ export async function githubRequest<T>(
                 "X-Accepted-GitHub-Permissions",
             );
 
+        // Logged in full server-side only - never returned to the caller,
+        // which only ever gets the safe top-level `message` below (if
+        // present) via ApiError.githubMessage.
         console.error(
             "GitHub API request failed",
             {
                 path,
                 status: response.status,
                 acceptedPermissions,
+                body: rawBody,
             },
         );
+
+        let githubMessage: string | undefined;
+
+        try {
+            const parsed =
+                JSON.parse(rawBody) as {
+                    message?: unknown;
+                };
+
+            if (
+                typeof parsed.message ===
+                "string"
+            ) {
+                githubMessage =
+                    parsed.message;
+            }
+        } catch {
+            // Not JSON, or no `message` field - githubMessage stays undefined.
+        }
 
         throw new ApiError(
             "GITHUB_API_ERROR",
             "GitHub API request failed.",
             502,
             response.status,
+            githubMessage,
         );
     }
 

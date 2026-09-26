@@ -6,6 +6,10 @@ import {
 } from "vitest";
 
 import {
+    ApiError,
+} from "@/shared/errors";
+
+import {
     PullRequestService,
 } from "@/github/actions/pull-request.service";
 
@@ -33,7 +37,9 @@ function connection(
     };
 }
 
-function makeService(overrides: { repositories?: unknown[] } = {}) {
+function makeService(
+    overrides: { repositories?: unknown[]; createError?: unknown } = {},
+) {
     const repositoryService = {
         listForConnection: vi.fn().mockResolvedValue(
             overrides.repositories ?? [
@@ -47,11 +53,13 @@ function makeService(overrides: { repositories?: unknown[] } = {}) {
     };
 
     const pullRequestClient = {
-        create: vi.fn().mockResolvedValue({
-            number: 51,
-            html_url: "https://github.com/orbit-collective/orbit/pull/51",
-            title: "Fix login redirect",
-        }),
+        create: overrides.createError
+            ? vi.fn().mockRejectedValue(overrides.createError)
+            : vi.fn().mockResolvedValue({
+                  number: 51,
+                  html_url: "https://github.com/orbit-collective/orbit/pull/51",
+                  title: "Fix login redirect",
+              }),
     };
 
     return {
@@ -108,6 +116,53 @@ describe("PullRequestService", () => {
         ).rejects.toThrow("This repository is not connected to this project.");
 
         expect(pullRequestClient.create).not.toHaveBeenCalled();
+    });
+
+    it("maps a GitHub rejection with a message into GITHUB_PULL_REQUEST_REJECTED", async () => {
+        const { service } = makeService({
+            createError: new ApiError(
+                "GITHUB_API_ERROR",
+                "GitHub API request failed.",
+                502,
+                422,
+                "A pull request already exists for orbit-collective:fix/login-redirect.",
+            ),
+        });
+
+        await expect(
+            service.create(connection(), {
+                repositoryId: 456,
+                title: "Fix login",
+                head: "fix/login-redirect",
+                base: "main",
+                body: "",
+            }),
+        ).rejects.toMatchObject({
+            code: "GITHUB_PULL_REQUEST_REJECTED",
+            message:
+                "A pull request already exists for orbit-collective:fix/login-redirect.",
+        });
+    });
+
+    it("does not swallow a GitHub rejection with no message", async () => {
+        const { service } = makeService({
+            createError: new ApiError(
+                "GITHUB_API_ERROR",
+                "GitHub API request failed.",
+                502,
+                500,
+            ),
+        });
+
+        await expect(
+            service.create(connection(), {
+                repositoryId: 456,
+                title: "x",
+                head: "a",
+                base: "b",
+                body: "",
+            }),
+        ).rejects.toMatchObject({ code: "GITHUB_API_ERROR" });
     });
 
     it("rejects when the connection is not connected", async () => {

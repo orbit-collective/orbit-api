@@ -99,18 +99,42 @@ export class PullRequestService {
                         .installationId,
                 );
 
-        const pullRequest =
-            await this
-                .pullRequestClient
-                .create(
-                    installationToken.token,
-                    repository.owner,
-                    repository.name,
-                    input.title,
-                    input.head,
-                    input.base,
-                    input.body,
+        let pullRequest;
+
+        try {
+            pullRequest =
+                await this
+                    .pullRequestClient
+                    .create(
+                        installationToken.token,
+                        repository.owner,
+                        repository.name,
+                        input.title,
+                        input.head,
+                        input.base,
+                        input.body,
+                    );
+        } catch (error) {
+            // GitHub's own top-level `message` (e.g. "Validation Failed",
+            // "No commits between master and my-branch", or "A pull request
+            // already exists for owner:head.") is safe to surface as-is -
+            // it's already public API response text, not an internal
+            // detail - unlike the generic "GitHub API request failed."
+            // every other failure reduces to.
+            if (
+                error instanceof
+                ApiError &&
+                error.githubMessage
+            ) {
+                throw new ApiError(
+                    "GITHUB_PULL_REQUEST_REJECTED",
+                    error.githubMessage,
+                    422,
                 );
+            }
+
+            throw error;
+        }
 
         return {
             number:

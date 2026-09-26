@@ -250,5 +250,48 @@ describe(
                 });
             },
         );
+
+        it(
+            "extracts GitHub's own safe top-level message from a JSON error body",
+            async () => {
+                fetchMock.mockResolvedValue(
+                    new Response(
+                        JSON.stringify({
+                            message: "Validation Failed",
+                            errors: [{ resource: "PullRequest", code: "custom" }],
+                        }),
+                        { status: 422 },
+                    ),
+                );
+
+                await expect(
+                    githubRequest("/repos/o/r/pulls", {
+                        method: "POST",
+                        token: "jwt",
+                        body: {},
+                    }),
+                ).rejects.toMatchObject({
+                    code: "GITHUB_API_ERROR",
+                    githubStatus: 422,
+                    githubMessage: "Validation Failed",
+                });
+            },
+        );
+
+        it(
+            "leaves githubMessage undefined for a non-JSON error body",
+            async () => {
+                fetchMock.mockResolvedValue(
+                    new Response("Internal Server Error", { status: 500 }),
+                );
+
+                await expect(
+                    githubRequest("/app", { token: "jwt" }),
+                ).rejects.toMatchObject({
+                    code: "GITHUB_API_ERROR",
+                    githubMessage: undefined,
+                });
+            },
+        );
     },
 );

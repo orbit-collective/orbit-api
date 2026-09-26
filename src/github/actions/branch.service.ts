@@ -133,6 +133,21 @@ export class BranchService {
                 );
             }
 
+            // Any other GitHub rejection - surface its own safe, public
+            // top-level message instead of the generic "GitHub API request
+            // failed." (see PullRequestService for the same pattern).
+            if (
+                error instanceof
+                ApiError &&
+                error.githubMessage
+            ) {
+                throw new ApiError(
+                    "GITHUB_BRANCH_REJECTED",
+                    error.githubMessage,
+                    422,
+                );
+            }
+
             throw error;
         }
 

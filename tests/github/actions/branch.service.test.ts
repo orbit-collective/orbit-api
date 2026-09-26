@@ -169,7 +169,29 @@ describe("BranchService", () => {
         ).rejects.toMatchObject({ code: "GITHUB_BRANCH_ALREADY_EXISTS" });
     });
 
-    it("does not swallow an unrelated GitHub failure", async () => {
+    it("maps an unrelated GitHub failure with a message into GITHUB_BRANCH_REJECTED", async () => {
+        const { service } = makeService({
+            createError: new ApiError(
+                "GITHUB_API_ERROR",
+                "GitHub API request failed.",
+                502,
+                403,
+                "Resource not accessible by integration",
+            ),
+        });
+
+        await expect(
+            service.create(connection(), {
+                repositoryId: 456,
+                name: "1234-fix-login",
+            }),
+        ).rejects.toMatchObject({
+            code: "GITHUB_BRANCH_REJECTED",
+            message: "Resource not accessible by integration",
+        });
+    });
+
+    it("does not swallow an unrelated GitHub failure with no message", async () => {
         const { service } = makeService({
             createError: new ApiError(
                 "GITHUB_API_ERROR",

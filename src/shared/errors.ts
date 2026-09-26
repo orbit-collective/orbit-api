@@ -13,11 +13,21 @@ export class ApiError extends Error {
      */
     public readonly githubStatus?: number;
 
+    /**
+     * GitHub's own top-level `message` from a failed response body (e.g.
+     * "Validation Failed", "No commits between master and my-branch") - safe
+     * to surface to an end user (GitHub itself returns it in a public API
+     * response), unlike the full response body, which is only ever logged
+     * server-side.
+     */
+    public readonly githubMessage?: string;
+
     public constructor(
         code: string,
         message: string,
         status = 400,
         githubStatus?: number,
+        githubMessage?: string,
     ) {
         super(message);
 
@@ -27,6 +37,10 @@ export class ApiError extends Error {
 
         if (githubStatus !== undefined) {
             this.githubStatus = githubStatus;
+        }
+
+        if (githubMessage !== undefined) {
+            this.githubMessage = githubMessage;
         }
     }
 }
