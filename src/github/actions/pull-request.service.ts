@@ -18,6 +18,10 @@ import {
     GitHubPullRequestClient,
 } from "./pull-request.client";
 
+import {
+    GitHubPullRequestTemplateClient,
+} from "./pull-request-template.client";
+
 import type {
     CreateGitHubPullRequestRequest,
 } from "./pull-request-request.model";
@@ -47,7 +51,31 @@ export class PullRequestService {
 
         private readonly pullRequestClient =
         new GitHubPullRequestClient(),
+
+        private readonly pullRequestTemplateClient =
+        new GitHubPullRequestTemplateClient(),
     ) {}
+
+    /**
+     * @throws ApiError GITHUB_REPOSITORY_NOT_ALLOWED if repositoryId is not
+     *                    one of this connection's own repositories.
+     */
+    public async getTemplate(
+        connection: GitHubConnection,
+        repositoryId: number,
+    ): Promise<string | null> {
+        const { repository, installationToken } =
+            await this.authorize(
+                connection,
+                repositoryId,
+            );
+
+        return this.pullRequestTemplateClient.find(
+            installationToken.token,
+            repository.owner,
+            repository.name,
+        );
+    }
 
     /**
      * @throws ApiError GITHUB_REPOSITORY_NOT_ALLOWED if repositoryId is not
@@ -57,47 +85,11 @@ export class PullRequestService {
         connection: GitHubConnection,
         input: CreateGitHubPullRequestRequest,
     ): Promise<CreatedGitHubPullRequest> {
-        if (
-            connection.status !==
-            "connected" ||
-            connection.installationId ===
-            null
-        ) {
-            throw new ApiError(
-                "CONNECTION_NOT_CONNECTED",
-                "GitHub connection is not connected.",
-                409,
+        const { repository, installationToken } =
+            await this.authorize(
+                connection,
+                input.repositoryId,
             );
-        }
-
-        const repositories =
-            await this.repositoryService
-                .listForConnection(
-                    connection,
-                );
-
-        const repository =
-            repositories.find(
-                (candidate) =>
-                    candidate.repositoryId ===
-                    input.repositoryId,
-            );
-
-        if (!repository) {
-            throw new ApiError(
-                "GITHUB_REPOSITORY_NOT_ALLOWED",
-                "This repository is not connected to this project.",
-                403,
-            );
-        }
-
-        const installationToken =
-            await this
-                .installationTokenService
-                .create(
-                    connection
-                        .installationId,
-                );
 
         let pullRequest;
 
@@ -145,6 +137,63 @@ export class PullRequestService {
 
             title:
             pullRequest.title,
+        };
+    }
+
+    /**
+     * Shared connection-status/repository-ownership check and installation
+     * token creation, used by both create() and getTemplate() - a repository
+     * belonging to another connection is rejected the same way for either.
+     */
+    private async authorize(
+        connection: GitHubConnection,
+        repositoryId: number,
+    ) {
+        if (
+            connection.status !==
+            "connected" ||
+            connection.installationId ===
+            null
+        ) {
+            throw new ApiError(
+                "CONNECTION_NOT_CONNECTED",
+                "GitHub connection is not connected.",
+                409,
+            );
+        }
+
+        const repositories =
+            await this.repositoryService
+                .listForConnection(
+                    connection,
+                );
+
+        const repository =
+            repositories.find(
+                (candidate) =>
+                    candidate.repositoryId ===
+                    repositoryId,
+            );
+
+        if (!repository) {
+            throw new ApiError(
+                "GITHUB_REPOSITORY_NOT_ALLOWED",
+                "This repository is not connected to this project.",
+                403,
+            );
+        }
+
+        const installationToken =
+            await this
+                .installationTokenService
+                .create(
+                    connection
+                        .installationId,
+                );
+
+        return {
+            repository,
+            installationToken,
         };
     }
 }

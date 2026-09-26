@@ -67,3 +67,9 @@
   to = "/.netlify/functions/github-pull-requests"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/pull-request-template"
+  to = "/.netlify/functions/github-pull-request-template"
+  status = 200
+  force = true

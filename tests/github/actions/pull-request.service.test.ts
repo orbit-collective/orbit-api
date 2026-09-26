@@ -38,7 +38,11 @@ function connection(
 }
 
 function makeService(
-    overrides: { repositories?: unknown[]; createError?: unknown } = {},
+    overrides: {
+        repositories?: unknown[];
+        createError?: unknown;
+        template?: string | null;
+    } = {},
 ) {
     const repositoryService = {
         listForConnection: vi.fn().mockResolvedValue(
@@ -62,14 +66,20 @@ function makeService(
               }),
     };
 
+    const pullRequestTemplateClient = {
+        find: vi.fn().mockResolvedValue(overrides.template ?? null),
+    };
+
     return {
         service: new PullRequestService(
             repositoryService as never,
             installationTokenService as never,
             pullRequestClient as never,
+            pullRequestTemplateClient as never,
         ),
         repositoryService,
         pullRequestClient,
+        pullRequestTemplateClient,
     };
 }
 
@@ -163,6 +173,39 @@ describe("PullRequestService", () => {
                 body: "",
             }),
         ).rejects.toMatchObject({ code: "GITHUB_API_ERROR" });
+    });
+
+    it("getTemplate returns the repository's template content", async () => {
+        const { service, pullRequestTemplateClient } = makeService({
+            template: "## Summary\n",
+        });
+
+        const result = await service.getTemplate(connection(), 456);
+
+        expect(result).toBe("## Summary\n");
+        expect(pullRequestTemplateClient.find).toHaveBeenCalledWith(
+            "installation-token",
+            "orbit-collective",
+            "orbit",
+        );
+    });
+
+    it("getTemplate returns null when the repository has no template", async () => {
+        const { service } = makeService({ template: null });
+
+        expect(await service.getTemplate(connection(), 456)).toBeNull();
+    });
+
+    it("getTemplate rejects a repository not connected to this project", async () => {
+        const { service, pullRequestTemplateClient } = makeService({
+            repositories: [],
+        });
+
+        await expect(
+            service.getTemplate(connection(), 999),
+        ).rejects.toThrow("This repository is not connected to this project.");
+
+        expect(pullRequestTemplateClient.find).not.toHaveBeenCalled();
     });
 
     it("rejects when the connection is not connected", async () => {
