@@ -112,6 +112,49 @@ describe(
         );
 
         it(
+            "uses the given redirectUri over the App's default callback when provided",
+            async () => {
+                fetchMock
+                    .mockResolvedValue(
+                        new Response(
+                            JSON.stringify({
+                                access_token:
+                                    "gho_token",
+
+                                token_type:
+                                    "bearer",
+
+                                scope: "",
+                            }),
+                            {
+                                status: 200,
+                            },
+                        ),
+                    );
+
+                await new GitHubOAuthService()
+                    .exchangeCode(
+                        "code",
+                        "https://api.orbit-dev.app/v1/auth/github/callback",
+                    );
+
+                const [
+                    ,
+                    init,
+                ] = fetchMock.mock
+                    .calls[0]!;
+
+                expect(
+                    JSON.parse(
+                        init.body,
+                    ).redirect_uri,
+                ).toBe(
+                    "https://api.orbit-dev.app/v1/auth/github/callback",
+                );
+            },
+        );
+
+        it(
             "fails when github rejects the request",
             async () => {
                 fetchMock

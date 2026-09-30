@@ -13,6 +13,7 @@ import type {
 export class GitHubOAuthService {
     public async exchangeCode(
         code: string,
+        redirectUri?: string,
     ): Promise<string> {
         const config =
             getGitHubAppConfig();
@@ -45,6 +46,7 @@ export class GitHubOAuthService {
                             code,
 
                             redirect_uri:
+                            redirectUri ??
                             config.callbackUrl,
                         }),
                 },
