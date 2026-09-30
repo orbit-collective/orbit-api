@@ -73,3 +73,21 @@
   to = "/.netlify/functions/github-pull-request-template"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/auth/github/redirect"
+  to = "/.netlify/functions/github-login-redirect"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/auth/github/callback"
+  to = "/.netlify/functions/github-login-callback"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/auth/github/resolve"
+  to = "/.netlify/functions/github-login-resolve"
+  status = 200
+  force = true
