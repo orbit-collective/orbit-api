@@ -53,6 +53,19 @@ export class GitHubOAuthService {
             );
 
         if (!response.ok) {
+            const rawBody =
+                await response.text();
+
+            // Logged in full server-side only - never returned to the
+            // caller, mirroring githubRequest()'s own convention.
+            console.error(
+                "GitHub OAuth token exchange failed",
+                {
+                    status: response.status,
+                    body: rawBody,
+                },
+            );
+
             throw new ApiError(
                 "GITHUB_OAUTH_ERROR",
                 "GitHub OAuth authorization failed.",
@@ -64,12 +77,28 @@ export class GitHubOAuthService {
             await response.json() as
                 GitHubUserAccessTokenResponse & {
                 error?: string;
+                error_description?: string;
             };
 
         if (
             result.error ||
             !result.access_token
         ) {
+            // GitHub's token endpoint answers 200 OK even on failure (e.g.
+            // "redirect_uri_mismatch", "bad_verification_code") - the only
+            // signal is this JSON body, so it has to be logged here rather
+            // than relying on the HTTP status above.
+            console.error(
+                "GitHub OAuth token exchange rejected",
+                {
+                    error:
+                        result.error,
+
+                    description:
+                        result.error_description,
+                },
+            );
+
             throw new ApiError(
                 "GITHUB_OAUTH_ERROR",
                 "GitHub OAuth authorization failed.",

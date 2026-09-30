@@ -140,7 +140,12 @@ export class GitHubLoginService {
             redirectUrl.searchParams.set("exchange_token", token);
 
             return { redirectUrl: redirectUrl.toString() };
-        } catch {
+        } catch (error) {
+            console.error(
+                "GitHub login callback failed",
+                error,
+            );
+
             return {
                 redirectUrl: withError(
                     loginState.returnTo,
