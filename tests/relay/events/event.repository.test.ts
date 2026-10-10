@@ -846,5 +846,134 @@ describe(
                 vi.useRealTimers();
             },
         );
+
+        it(
+            "does not delete the lookup of a newer event that reused the delivery id",
+            async () => {
+                await seed(
+                    1,
+                    () => ({
+                        expiresAt:
+                            "2020-01-01T00:00:00.000Z",
+                    }),
+                );
+
+                const store =
+                    state.store!;
+                const realDelete =
+                    store.delete.bind(
+                        store,
+                    );
+
+                vi.spyOn(
+                    console,
+                    "warn",
+                ).mockImplementation(
+                    () => {},
+                );
+
+                // A purge that deleted the lookup, then failed on the event.
+                store.delete =
+                    async key => {
+                        if (
+                            key.startsWith(
+                                "events/",
+                            )
+                        ) {
+                            throw new Error(
+                                "storage unavailable",
+                            );
+                        }
+
+                        await realDelete(
+                            key,
+                        );
+                    };
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                store.delete =
+                    realDelete;
+
+                expect(
+                    store.entries.has(
+                        "event-delivery/connection-1/delivery-0",
+                    ),
+                ).toBe(false);
+
+                // The webhook is retried: a new event reuses the delivery id.
+                await repository.create(
+                    createEvent({
+                        id: "event-retry",
+
+                        deliveryId:
+                            "delivery-0",
+                    }),
+                );
+
+                const pending =
+                    await repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                expect(
+                    pending.map(
+                        event => event.id,
+                    ),
+                ).toEqual([
+                    "event-retry",
+                ]);
+
+                expect(
+                    store.entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(false);
+
+                const found =
+                    await repository
+                        .findByDeliveryId(
+                            "connection-1",
+                            "delivery-0",
+                        );
+
+                expect(found?.id)
+                    .toBe("event-retry");
+
+                vi.restoreAllMocks();
+            },
+        );
+
+        it(
+            "purges an expired event whose lookup is already gone",
+            async () => {
+                await seed(
+                    1,
+                    () => ({
+                        expiresAt:
+                            "2020-01-01T00:00:00.000Z",
+                    }),
+                );
+
+                state.store!.entries.delete(
+                    "event-delivery/connection-1/delivery-0",
+                );
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                expect(
+                    state.store!.entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(false);
+            },
+        );
     },
 );
