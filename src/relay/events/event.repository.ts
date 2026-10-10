@@ -9,6 +9,14 @@ const READ_CONCURRENCY = 16;
 /** Expired events removed per listing, so one call can't run unbounded. */
 const PURGE_LIMIT = 100;
 
+/**
+ * How long a listing waits for its cleanup. The caller (Orbit Local) gives
+ * up after 10 seconds, so a slow delete must never hold back events that
+ * are already loaded; deletes still running after this are left to finish
+ * or to be retried by the next listing.
+ */
+const PURGE_BUDGET_MS = 2_000;
+
 export class EventRepository {
     public async create(
         event: GitHubRelayEvent,
@@ -159,8 +167,9 @@ export class EventRepository {
      *
      * Only expired events are removed: a processed event that has not
      * expired yet must stay, because acknowledging it again has to
-     * remain a harmless no-op. Best effort and bounded per call - a
-     * failed delete is simply retried on the next listing.
+     * remain a harmless no-op. Best effort and bounded per call, in
+     * count and in time - whatever a call did not finish is retried on
+     * the next listing.
      */
     private async purgeExpired(
         expired: GitHubRelayEvent[],
@@ -172,44 +181,72 @@ export class EventRepository {
         const store =
             getOrbitStore();
 
-        await mapWithConcurrency(
-            expired.slice(
-                0,
-                PURGE_LIMIT,
-            ),
-            READ_CONCURRENCY,
-            async event => {
-                try {
-                    await store.delete(
-                        eventKeys.byId(
-                            event.connectionId,
-                            event.id,
-                        ),
-                    );
+        const purge =
+            mapWithConcurrency(
+                expired.slice(
+                    0,
+                    PURGE_LIMIT,
+                ),
+                READ_CONCURRENCY,
+                async event => {
+                    try {
+                        /*
+                         * The delivery lookup goes first. The event blob is
+                         * the only key listPending() can find, so as long as
+                         * it exists a half-finished purge is retried on the
+                         * next listing; deleting it first would orphan the
+                         * lookup for good if the second delete failed.
+                         */
+                        await store.delete(
+                            eventKeys.byDelivery(
+                                event.connectionId,
+                                event.deliveryId,
+                            ),
+                        );
 
-                    await store.delete(
-                        eventKeys.byDelivery(
-                            event.connectionId,
-                            event.deliveryId,
-                        ),
+                        await store.delete(
+                            eventKeys.byId(
+                                event.connectionId,
+                                event.id,
+                            ),
+                        );
+                    } catch (error) {
+                        console.warn(
+                            "Failed to purge an expired relay event",
+                            {
+                                connectionId:
+                                event.connectionId,
+                                relayEventId:
+                                event.id,
+                                error:
+                                    error instanceof Error
+                                        ? error.message
+                                        : String(error),
+                            },
+                        );
+                    }
+                },
+            );
+
+        let timer:
+            ReturnType<
+                typeof setTimeout
+            > | undefined;
+
+        await Promise.race([
+            purge,
+
+            new Promise<void>(
+                resolve => {
+                    timer = setTimeout(
+                        resolve,
+                        PURGE_BUDGET_MS,
                     );
-                } catch (error) {
-                    console.warn(
-                        "Failed to purge an expired relay event",
-                        {
-                            connectionId:
-                            event.connectionId,
-                            relayEventId:
-                            event.id,
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : String(error),
-                        },
-                    );
-                }
-            },
-        );
+                },
+            ),
+        ]);
+
+        clearTimeout(timer);
     }
 
     public async markProcessed(
