@@ -1,7 +1,13 @@
+import { mapWithConcurrency } from "@/shared/concurrency";
 import { getOrbitStore } from "@/shared/storage";
 
 import { eventKeys } from "./event.keys";
 import type { GitHubRelayEvent } from "./event.model";
+
+const READ_CONCURRENCY = 16;
+
+/** Expired events removed per listing, so one call can't run unbounded. */
+const PURGE_LIMIT = 100;
 
 export class EventRepository {
     public async create(
@@ -76,38 +82,61 @@ export class EventRepository {
                     ),
             });
 
+        /*
+         * Every event blob is read, so the cost of this call is the
+         * number of blobs times one round trip. Reading them in
+         * parallel keeps a backlog from pushing the response past the
+         * caller's timeout (Orbit Local gives up after 10 seconds).
+         */
+        const loaded =
+            await mapWithConcurrency(
+                result.blobs,
+                READ_CONCURRENCY,
+                async blob =>
+                    await store.get(
+                        blob.key,
+                        {
+                            type: "json",
+                            consistency:
+                                "strong",
+                        },
+                    ) as
+                        GitHubRelayEvent |
+                        null,
+            );
+
+        const now = Date.now();
         const events:
             GitHubRelayEvent[] = [];
+        const expired:
+            GitHubRelayEvent[] = [];
 
-        for (
-            const blob of result.blobs
-            ) {
-            const event =
-                await store.get(
-                    blob.key,
-                    {
-                        type: "json",
-                        consistency:
-                            "strong",
-                    },
-                ) as
-                    GitHubRelayEvent |
-                    null;
+        for (const event of loaded) {
+            if (!event) {
+                continue;
+            }
 
             if (
-                event &&
-                event.processedAt ===
-                null &&
                 Date.parse(
                     event.expiresAt,
-                ) >
-                Date.now()
+                ) <= now
             ) {
-                events.push(
-                    event,
-                );
+                expired.push(event);
+
+                continue;
+            }
+
+            if (
+                event.processedAt ===
+                null
+            ) {
+                events.push(event);
             }
         }
+
+        await this.purgeExpired(
+            expired,
+        );
 
         return events
             .sort(
@@ -120,6 +149,67 @@ export class EventRepository {
                 0,
                 limit,
             );
+    }
+
+    /**
+     * Deletes events past their 24 hour expiry, along with their
+     * delivery lookup key. Nothing else ever removes them, so without
+     * this the blobs of a connection - and with them the cost of
+     * listPending() - would only ever grow.
+     *
+     * Only expired events are removed: a processed event that has not
+     * expired yet must stay, because acknowledging it again has to
+     * remain a harmless no-op. Best effort and bounded per call - a
+     * failed delete is simply retried on the next listing.
+     */
+    private async purgeExpired(
+        expired: GitHubRelayEvent[],
+    ): Promise<void> {
+        if (expired.length === 0) {
+            return;
+        }
+
+        const store =
+            getOrbitStore();
+
+        await mapWithConcurrency(
+            expired.slice(
+                0,
+                PURGE_LIMIT,
+            ),
+            READ_CONCURRENCY,
+            async event => {
+                try {
+                    await store.delete(
+                        eventKeys.byId(
+                            event.connectionId,
+                            event.id,
+                        ),
+                    );
+
+                    await store.delete(
+                        eventKeys.byDelivery(
+                            event.connectionId,
+                            event.deliveryId,
+                        ),
+                    );
+                } catch (error) {
+                    console.warn(
+                        "Failed to purge an expired relay event",
+                        {
+                            connectionId:
+                            event.connectionId,
+                            relayEventId:
+                            event.id,
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error),
+                        },
+                    );
+                }
+            },
+        );
     }
 
     public async markProcessed(

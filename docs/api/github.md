@@ -129,7 +129,10 @@ GitHub webhook
 → Local creates orbit[bot] comment
 → Local ACKs event
 
-Relay events expire after 24 hours.
+Relay events expire after 24 hours. Expired events are no longer returned
+and are deleted lazily, a bounded batch at a time, whenever the connection
+lists its pending events; acknowledging an event that has already been
+deleted therefore returns `EVENT_NOT_FOUND` instead of `EVENT_EXPIRED`.
 
 ### Error format
 ```ts
