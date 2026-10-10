@@ -719,5 +719,132 @@ describe(
                 warn.mockRestore();
             },
         );
+
+        it(
+            "retries a half-finished purge: the event blob outlives a failed delete of its lookup",
+            async () => {
+                await seed(
+                    1,
+                    () => ({
+                        expiresAt:
+                            "2020-01-01T00:00:00.000Z",
+                    }),
+                );
+
+                const store =
+                    state.store!;
+                const realDelete =
+                    store.delete.bind(
+                        store,
+                    );
+
+                vi.spyOn(
+                    console,
+                    "warn",
+                ).mockImplementation(
+                    () => {},
+                );
+
+                store.delete =
+                    async key => {
+                        if (
+                            key.startsWith(
+                                "event-delivery/",
+                            )
+                        ) {
+                            throw new Error(
+                                "storage unavailable",
+                            );
+                        }
+
+                        await realDelete(
+                            key,
+                        );
+                    };
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                /*
+                 * The lookup is deleted first and failed, so the event blob
+                 * is still there for the next listing to find.
+                 */
+                expect(
+                    store.entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(true);
+
+                store.delete =
+                    realDelete;
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                expect(
+                    store.entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(false);
+
+                expect(
+                    store.entries.has(
+                        "event-delivery/connection-1/delivery-0",
+                    ),
+                ).toBe(false);
+
+                vi.restoreAllMocks();
+            },
+        );
+
+        it(
+            "does not let a slow cleanup hold back the pending events",
+            async () => {
+                vi.useFakeTimers();
+
+                await seed(
+                    2,
+                    index => index === 0
+                        ? {
+                            expiresAt:
+                                "2020-01-01T00:00:00.000Z",
+                        }
+                        : {},
+                );
+
+                state.store!.delete =
+                    () =>
+                        new Promise(
+                            () => {},
+                        );
+
+                const listing =
+                    repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                await vi.advanceTimersByTimeAsync(
+                    2_000,
+                );
+
+                const pending =
+                    await listing;
+
+                expect(
+                    pending.map(
+                        event => event.id,
+                    ),
+                ).toEqual([
+                    "event-1",
+                ]);
+
+                vi.useRealTimers();
+            },
+        );
     },
 );

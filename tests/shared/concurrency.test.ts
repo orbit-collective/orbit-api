@@ -37,6 +37,38 @@ describe(
         );
 
         it(
+            "keeps input order even when later calls finish first",
+            async () => {
+                const finished: number[] = [];
+
+                const results =
+                    await mapWithConcurrency(
+                        [0, 1, 2],
+                        3,
+                        async value => {
+                            await new Promise(
+                                resolve =>
+                                    setTimeout(
+                                        resolve,
+                                        (3 - value) * 10,
+                                    ),
+                            );
+
+                            finished.push(value);
+
+                            return value;
+                        },
+                    );
+
+                expect(finished)
+                    .toEqual([2, 1, 0]);
+
+                expect(results)
+                    .toEqual([0, 1, 2]);
+            },
+        );
+
+        it(
             "never runs more than `limit` calls at once, and does run them in parallel",
             async () => {
                 let active = 0;
