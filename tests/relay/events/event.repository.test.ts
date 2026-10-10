@@ -415,3 +415,309 @@ describe(
         );
     },
 );
+
+
+describe(
+    "EventRepository.listPending at scale",
+    () => {
+        const seed = async (
+            count: number,
+            overrides: (
+                index: number,
+            ) => Partial<GitHubRelayEvent> = () => ({}),
+        ) => {
+            for (let i = 0; i < count; i++) {
+                await repository.create(
+                    createEvent({
+                        id: `event-${i}`,
+
+                        deliveryId:
+                            `delivery-${i}`,
+
+                        createdAt:
+                            new Date(
+                                Date.UTC(
+                                    2026,
+                                    8,
+                                    19,
+                                    0,
+                                    i,
+                                ),
+                            ).toISOString(),
+
+                        ...overrides(i),
+                    }),
+                );
+            }
+        };
+
+        it(
+            "reads the stored events in parallel instead of one after another",
+            async () => {
+                await seed(40);
+
+                const store =
+                    state.store!;
+                const originalGet =
+                    store.get.bind(
+                        store,
+                    );
+                let active = 0;
+                let peak = 0;
+
+                store.get =
+                    async (
+                        key,
+                        options,
+                    ) => {
+                        active++;
+                        peak = Math.max(
+                            peak,
+                            active,
+                        );
+
+                        await new Promise(
+                            resolve =>
+                                setTimeout(
+                                    resolve,
+                                    1,
+                                ),
+                        );
+
+                        active--;
+
+                        return originalGet(
+                            key,
+                            options,
+                        );
+                    };
+
+                const pending =
+                    await repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                expect(
+                    pending,
+                ).toHaveLength(40);
+
+                expect(peak)
+                    .toBeGreaterThan(1);
+
+                expect(peak)
+                    .toBeLessThanOrEqual(
+                        16,
+                    );
+            },
+        );
+
+        it(
+            "purges expired events and their delivery lookup",
+            async () => {
+                await seed(
+                    4,
+                    index => index < 2
+                        ? {
+                            expiresAt:
+                                "2020-01-01T00:00:00.000Z",
+                        }
+                        : {},
+                );
+
+                const entries =
+                    state.store!.entries;
+
+                expect(
+                    entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(true);
+
+                const pending =
+                    await repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                expect(
+                    pending.map(
+                        event => event.id,
+                    ),
+                ).toEqual([
+                    "event-2",
+                    "event-3",
+                ]);
+
+                for (const id of [0, 1]) {
+                    expect(
+                        entries.has(
+                            `events/connection-1/event-${id}`,
+                        ),
+                    ).toBe(false);
+
+                    expect(
+                        entries.has(
+                            `event-delivery/connection-1/delivery-${id}`,
+                        ),
+                    ).toBe(false);
+                }
+
+                expect(
+                    entries.has(
+                        "events/connection-1/event-2",
+                    ),
+                ).toBe(true);
+            },
+        );
+
+        it(
+            "keeps processed events that have not expired, so a repeated ack stays a no-op",
+            async () => {
+                await seed(
+                    2,
+                    index => index === 0
+                        ? {
+                            processedAt:
+                                "2026-09-19T00:05:00.000Z",
+                        }
+                        : {},
+                );
+
+                const pending =
+                    await repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                expect(
+                    pending.map(
+                        event => event.id,
+                    ),
+                ).toEqual([
+                    "event-1",
+                ]);
+
+                expect(
+                    state.store!.entries.has(
+                        "events/connection-1/event-0",
+                    ),
+                ).toBe(true);
+            },
+        );
+
+        it(
+            "does not touch another connection's events",
+            async () => {
+                await repository.create(
+                    createEvent({
+                        id: "other-event",
+
+                        connectionId:
+                            "connection-2",
+
+                        deliveryId:
+                            "other-delivery",
+
+                        expiresAt:
+                            "2020-01-01T00:00:00.000Z",
+                    }),
+                );
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                expect(
+                    state.store!.entries.has(
+                        "events/connection-2/other-event",
+                    ),
+                ).toBe(true);
+            },
+        );
+
+        it(
+            "caps how many expired events one listing purges",
+            async () => {
+                await seed(
+                    130,
+                    () => ({
+                        expiresAt:
+                            "2020-01-01T00:00:00.000Z",
+                    }),
+                );
+
+                await repository
+                    .listPending(
+                        "connection-1",
+                    );
+
+                const remaining =
+                    [
+                        ...state.store!
+                            .entries
+                            .keys(),
+                    ].filter(
+                        key =>
+                            key.startsWith(
+                                "events/connection-1/",
+                            ),
+                    );
+
+                expect(
+                    remaining,
+                ).toHaveLength(30);
+            },
+        );
+
+        it(
+            "still lists pending events when a purge fails",
+            async () => {
+                await seed(
+                    2,
+                    index => index === 0
+                        ? {
+                            expiresAt:
+                                "2020-01-01T00:00:00.000Z",
+                        }
+                        : {},
+                );
+
+                state.store!.delete =
+                    async () => {
+                        throw new Error(
+                            "storage unavailable",
+                        );
+                    };
+
+                const warn =
+                    vi.spyOn(
+                        console,
+                        "warn",
+                    ).mockImplementation(
+                        () => {},
+                    );
+
+                const pending =
+                    await repository
+                        .listPending(
+                            "connection-1",
+                        );
+
+                expect(
+                    pending.map(
+                        event => event.id,
+                    ),
+                ).toEqual([
+                    "event-1",
+                ]);
+
+                expect(warn)
+                    .toHaveBeenCalledOnce();
+
+                warn.mockRestore();
+            },
+        );
+    },
+);
