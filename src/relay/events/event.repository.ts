@@ -196,13 +196,38 @@ export class EventRepository {
                          * it exists a half-finished purge is retried on the
                          * next listing; deleting it first would orphan the
                          * lookup for good if the second delete failed.
+                         *
+                         * It is only deleted while it still points at this
+                         * event. After a half-finished purge a retried
+                         * webhook may have written a new event under the same
+                         * delivery id, and that lookup is not ours to remove.
                          */
-                        await store.delete(
+                        const lookupKey =
                             eventKeys.byDelivery(
                                 event.connectionId,
                                 event.deliveryId,
-                            ),
-                        );
+                            );
+
+                        const lookup =
+                            await store.get(
+                                lookupKey,
+                                {
+                                    type: "json",
+                                    consistency:
+                                        "strong",
+                                },
+                            ) as {
+                                eventId: string;
+                            } | null;
+
+                        if (
+                            lookup?.eventId ===
+                            event.id
+                        ) {
+                            await store.delete(
+                                lookupKey,
+                            );
+                        }
 
                         await store.delete(
                             eventKeys.byId(
