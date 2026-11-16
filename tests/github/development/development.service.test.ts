@@ -59,6 +59,7 @@ function makeService(clientOverrides: Record<string, unknown> = {}) {
         listCommits: vi.fn().mockResolvedValue([]),
         listBranches: vi.fn().mockResolvedValue([]),
         listIssues: vi.fn().mockResolvedValue([]),
+        mergePullRequest: vi.fn().mockResolvedValue({ merged: true, sha: "abc", message: "Pull Request successfully merged" }),
         createComment: vi.fn().mockResolvedValue({ id: 5, html_url: "https://github.com/o/r/pull/7#c5" }),
         getRepository: vi.fn().mockResolvedValue({
             full_name: "o/r",
@@ -443,6 +444,40 @@ describe("DevelopmentService", () => {
         const other = makeService({ createComment: vi.fn().mockRejectedValue(failure) });
 
         await expect(other.service.commentOnPullRequest(connection, 1, 7, "x")).rejects.toBe(failure);
+    });
+
+    it("merges with the chosen method, passing only what was given", async () => {
+        const { service, client } = makeService();
+
+        const result = await service.mergePullRequest(connection, {
+            repositoryId: 1,
+            number: 7,
+            method: "squash",
+            commitTitle: "Add login (#7)",
+            expectedHeadSha: "abc1234",
+        });
+
+        expect(client.mergePullRequest).toHaveBeenCalledWith("tok", "o", "r", 7, {
+            method: "squash",
+            commitTitle: "Add login (#7)",
+            expectedHeadSha: "abc1234",
+        });
+        expect(result).toEqual({ merged: true, sha: "abc", message: "Pull Request successfully merged" });
+    });
+
+    it("says why GitHub refused to merge", async () => {
+        const { service } = makeService({
+            mergePullRequest: vi.fn().mockRejectedValue(
+                new ApiError("GITHUB_API_ERROR", "x", 502, 405, "Required status check is failing"),
+            ),
+        });
+
+        await expect(
+            service.mergePullRequest(connection, { repositoryId: 1, number: 7, method: "merge" }),
+        ).rejects.toMatchObject({
+            code: "GITHUB_PULL_REQUEST_REJECTED",
+            message: "Required status check is failing",
+        });
     });
 
     it("reports checks for a ref", async () => {

@@ -209,3 +209,11 @@ export interface GitHubIssue {
 
     pull_request?: unknown;
 }
+
+export interface GitHubMergeResult {
+    merged: boolean;
+
+    message: string;
+
+    sha: string;
+}
