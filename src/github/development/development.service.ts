@@ -26,6 +26,7 @@ import type {
     CiSummaryDto,
     CommitDto,
     InsightsDto,
+    IssuePageDto,
     PullRequestPageDto,
     PullRequestDetailDto,
     PullRequestDto,
@@ -35,6 +36,7 @@ import {
     summariseCi,
     toBranch,
     toCommit,
+    toIssue,
     toPullRequest,
     toPullRequestDetail,
 } from "./development.mapper";
@@ -186,6 +188,48 @@ export class DevelopmentService {
      * requests it is showing). A ref whose lookup failed is null, never an
      * error for the others.
      */
+    /**
+     * One page of the repository's issues (never its pull requests), newest
+     * update first. GitHub's list mixes the two, so a page can come back with
+     * fewer issues than it was asked for; `hasMore` follows GitHub's own page,
+     * not the filtered one.
+     */
+    public async listIssues(
+        connection: GitHubConnection,
+        repositoryId: number,
+        state: PullRequestListState,
+        page: number,
+        perPage: number,
+        since?: string,
+    ): Promise<IssuePageDto> {
+        const { repository, token } =
+            await this.access.authorize(
+                connection,
+                repositoryId,
+            );
+
+        const raw =
+            await this.client.listIssues(
+                token,
+                repository.owner,
+                repository.name,
+                state,
+                page,
+                perPage,
+                since,
+            );
+
+        return {
+            issues: raw
+                .filter(
+                    (issue) =>
+                        issue.pull_request === undefined,
+                )
+                .map(toIssue),
+            hasMore: raw.length === perPage,
+        };
+    }
+
     public async getChecksBatch(
         connection: GitHubConnection,
         repositoryId: number,

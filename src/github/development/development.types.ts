@@ -178,3 +178,34 @@ export interface GitHubRepositoryDetails {
 
     pushed_at: string | null;
 }
+
+/** An item of GitHub's issues list: pull requests show up there too, marked by `pull_request`. */
+export interface GitHubIssue {
+    id: number;
+
+    number: number;
+
+    title: string;
+
+    state: "open" | "closed";
+
+    html_url: string;
+
+    body: string | null;
+
+    user: GitHubUser | null;
+
+    labels: Array<GitHubLabel | string>;
+
+    assignees?: GitHubUser[];
+
+    comments: number;
+
+    created_at: string;
+
+    updated_at: string;
+
+    closed_at: string | null;
+
+    pull_request?: unknown;
+}
