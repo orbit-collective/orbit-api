@@ -11,12 +11,13 @@ import type {
 } from "@/relay/connections/connection.model";
 
 import {
+    BRANCHES_PAGE_SIZE,
     GitHubDevelopmentClient,
     type PullRequestListState,
 } from "./development.client";
 
 import type {
-    BranchDto,
+    BranchPageDto,
     CiSummaryDto,
     CommitDto,
     InsightsDto,
@@ -32,9 +33,16 @@ import {
     toPullRequestDetail,
 } from "./development.mapper";
 
+import type {
+    GitHubBranchSummary,
+} from "./development.types";
+
 import {
     RepositoryAccessService,
 } from "./repository-access.service";
+
+/** Most pages of branches read (a thousand branches): a repository past that is cut, not slow. */
+const MAX_BRANCH_PAGES = 10;
 
 /** How many open pull requests of a list get their CI looked up, and how many at once. */
 const CI_LOOKUP_LIMIT = 20;
@@ -262,31 +270,50 @@ export class DevelopmentService {
         return commits.map(toCommit);
     }
 
+    /**
+     * One page of the repository's branches, default branch first. GitHub
+     * lists them alphabetically and only a hundred at a time, so the whole
+     * list (up to MAX_BRANCH_PAGES pages) is read and cut here: that is the
+     * only way to put the default branch first and to report the real total.
+     */
     public async listBranches(
         connection: GitHubConnection,
         repositoryId: number,
-    ): Promise<BranchDto[]> {
+        page: number,
+        perPage: number,
+    ): Promise<BranchPageDto> {
         const { repository, token } =
             await this.access.authorize(
                 connection,
                 repositoryId,
             );
 
-        const [branches, details] =
-            await Promise.all([
-                this.client.listBranches(
-                    token,
-                    repository.owner,
-                    repository.name,
-                ),
-                this.client.getRepository(
-                    token,
-                    repository.owner,
-                    repository.name,
-                ),
-            ]);
+        const details =
+            await this.client.getRepository(
+                token,
+                repository.owner,
+                repository.name,
+            );
 
-        return branches
+        const all: GitHubBranchSummary[] = [];
+
+        for (let current = 1; current <= MAX_BRANCH_PAGES; current++) {
+            const batch =
+                await this.client.listBranches(
+                    token,
+                    repository.owner,
+                    repository.name,
+                    current,
+                );
+
+            all.push(...batch);
+
+            if (batch.length < BRANCHES_PAGE_SIZE) {
+                break;
+            }
+        }
+
+        const sorted = all
             .map((branch) =>
                 toBranch(
                     branch,
@@ -298,6 +325,16 @@ export class DevelopmentService {
                     Number(b.isDefault) -
                     Number(a.isDefault),
             );
+
+        return {
+            branches: sorted.slice(
+                (page - 1) * perPage,
+                page * perPage,
+            ),
+            total: sorted.length,
+            page,
+            perPage,
+        };
     }
 
     public async getChecks(

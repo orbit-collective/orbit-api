@@ -155,3 +155,14 @@ export interface InsightsDto {
         total: number;
     }>;
 }
+
+export interface BranchPageDto {
+    branches: BranchDto[];
+
+    /** Every branch of the repository (up to a safety cap), not just this page. */
+    total: number;
+
+    page: number;
+
+    perPage: number;
+}

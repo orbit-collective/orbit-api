@@ -248,10 +248,50 @@ describe("DevelopmentService", () => {
             ]),
         });
 
-        const branches = await service.listBranches(connection, 1);
+        const page = await service.listBranches(connection, 1, 1, 10);
 
-        expect(branches.map((b) => b.name)).toEqual(["main", "feat"]);
-        expect(branches[0]?.isDefault).toBe(true);
+        expect(page.branches.map((b) => b.name)).toEqual(["main", "feat"]);
+        expect(page.branches[0]?.isDefault).toBe(true);
+        expect(page).toMatchObject({ total: 2, page: 1, perPage: 10 });
+    });
+
+    it("reads every page of branches, so none is lost past the first hundred, and cuts the requested one", async () => {
+        const full = Array.from({ length: 100 }, (_, i) => ({
+            name: `a-${i}`,
+            protected: false,
+            commit: { sha: `${i}` },
+        }));
+        const rest = [{ name: "main", protected: true, commit: { sha: "m" } }];
+        const listBranches = vi.fn(
+            async (_t: string, _o: string, _r: string, page: number) =>
+                page === 1 ? full : rest,
+        );
+        const { service } = makeService({ listBranches });
+
+        const first = await service.listBranches(connection, 1, 1, 6);
+        const last = await service.listBranches(connection, 1, 17, 6);
+
+        expect(listBranches).toHaveBeenCalledTimes(2 * 2);
+        expect(first.total).toBe(101);
+        // The default branch (on the second GitHub page) still comes first.
+        expect(first.branches[0]?.name).toBe("main");
+        expect(first.branches).toHaveLength(6);
+        expect(last.branches).toHaveLength(5);
+    });
+
+    it("stops reading branches after a safety cap of pages", async () => {
+        const full = Array.from({ length: 100 }, (_, i) => ({
+            name: `b-${i}`,
+            protected: false,
+            commit: { sha: `${i}` },
+        }));
+        const listBranches = vi.fn().mockResolvedValue(full);
+        const { service } = makeService({ listBranches });
+
+        const page = await service.listBranches(connection, 1, 1, 10);
+
+        expect(listBranches).toHaveBeenCalledTimes(10);
+        expect(page.total).toBe(1000);
     });
 
     it("reports checks for a ref", async () => {

@@ -15,6 +15,9 @@ import type {
     GitHubReview,
 } from "./development.types";
 
+/** GitHub's largest page: the fewest requests to read every branch. */
+export const BRANCHES_PAGE_SIZE = 100;
+
 export type PullRequestListState =
     | "open"
     | "closed"
@@ -133,9 +136,10 @@ export class GitHubDevelopmentClient {
         token: string,
         owner: string,
         name: string,
+        page = 1,
     ): Promise<GitHubBranchSummary[]> {
         return githubRequest<GitHubBranchSummary[]>(
-            `${repositoryPath(owner, name)}/branches?per_page=100`,
+            `${repositoryPath(owner, name)}/branches?per_page=${BRANCHES_PAGE_SIZE}&page=${page}`,
             { token },
         );
     }

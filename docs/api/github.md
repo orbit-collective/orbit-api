@@ -184,13 +184,17 @@ validation message is returned as `GITHUB_PULL_REQUEST_REJECTED`.
 `message` is the subject line only; `branch` is optional (default branch).
 
 ### List branches
-`GET /branches?repositoryId=1`
+`GET /branches?repositoryId=1&page=1&perPage=10`
 
 ```ts
-{ "branches": [{ "name", "sha", "protected", "isDefault" }] }
+{ "branches": [{ "name", "sha", "protected", "isDefault" }],
+  "total": 134, "page": 1, "perPage": 10 }
 ```
 
-The default branch comes first.
+The default branch comes first. GitHub lists branches alphabetically and a
+hundred at a time, so orbit-api reads every page (up to 1000 branches),
+sorts and cuts the requested page; `total` is the real count. `perPage` is
+at most 100.
 
 ### Checks (CI)
 `GET /checks?repositoryId=1&ref=<branch-or-sha>`
