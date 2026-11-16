@@ -14,6 +14,7 @@ import {
     parseWithCi,
     parseRef,
     parseRepositoryId,
+    validateCommentRequest,
     validateUpdatePullRequestRequest,
 } from "@/github/development/development-request.validator";
 
@@ -149,5 +150,26 @@ describe("validateUpdatePullRequestRequest", () => {
         expect(() => validateUpdatePullRequestRequest(body)).toThrow(
             expect.objectContaining({ code }),
         );
+    });
+});
+
+describe("validateCommentRequest", () => {
+    it("accepts a repository, a pull request and a text", () => {
+        expect(validateCommentRequest({ repositoryId: 1, number: 2, body: "Hi" })).toEqual({
+            repositoryId: 1,
+            number: 2,
+            body: "Hi",
+        });
+    });
+
+    it.each([
+        [null, "INVALID_REQUEST_BODY"],
+        [{ repositoryId: 1, number: 2, body: "  " }, "INVALID_COMMENT_BODY"],
+        [{ repositoryId: 1, number: 2, body: 5 }, "INVALID_COMMENT_BODY"],
+        [{ repositoryId: 1, number: 2, body: "x".repeat(65537) }, "INVALID_COMMENT_BODY"],
+        [{ number: 2, body: "Hi" }, "INVALID_REPOSITORY_ID"],
+        [{ repositoryId: 1, body: "Hi" }, "INVALID_PULL_REQUEST_NUMBER"],
+    ])("rejects %j", (body, code) => {
+        expect(() => validateCommentRequest(body)).toThrow(expect.objectContaining({ code }));
     });
 });

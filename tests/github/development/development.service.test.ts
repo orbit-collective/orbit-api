@@ -59,6 +59,7 @@ function makeService(clientOverrides: Record<string, unknown> = {}) {
         listCommits: vi.fn().mockResolvedValue([]),
         listBranches: vi.fn().mockResolvedValue([]),
         listIssues: vi.fn().mockResolvedValue([]),
+        createComment: vi.fn().mockResolvedValue({ id: 5, html_url: "https://github.com/o/r/pull/7#c5" }),
         getRepository: vi.fn().mockResolvedValue({
             full_name: "o/r",
             description: "d",
@@ -416,6 +417,32 @@ describe("DevelopmentService", () => {
         // Two came back for a page of two: there may be more, though one was a pull request.
         expect(page.hasMore).toBe(true);
         expect(client.listIssues).toHaveBeenCalledWith("tok", "o", "r", "open", 1, 2, "2026-01-01T00:00:00.000Z");
+    });
+
+    it("comments on a pull request of the connection and hands back where", async () => {
+        const { service, client, access } = makeService();
+
+        const comment = await service.commentOnPullRequest(connection, 1, 7, "Linked.");
+
+        expect(access.authorize).toHaveBeenCalledWith(connection, 1);
+        expect(client.createComment).toHaveBeenCalledWith("tok", "o", "r", 7, "Linked.");
+        expect(comment).toEqual({ id: 5, url: "https://github.com/o/r/pull/7#c5" });
+    });
+
+    it("surfaces GitHub's own message when a comment is refused, and rethrows anything else", async () => {
+        const refused = makeService({
+            createComment: vi.fn().mockRejectedValue(new ApiError("GITHUB_API_ERROR", "x", 502, 403, "Resource not accessible")),
+        });
+
+        await expect(refused.service.commentOnPullRequest(connection, 1, 7, "x")).rejects.toMatchObject({
+            code: "GITHUB_COMMENT_REJECTED",
+            message: "Resource not accessible",
+        });
+
+        const failure = new ApiError("GITHUB_API_ERROR", "x", 502, 500);
+        const other = makeService({ createComment: vi.fn().mockRejectedValue(failure) });
+
+        await expect(other.service.commentOnPullRequest(connection, 1, 7, "x")).rejects.toBe(failure);
     });
 
     it("reports checks for a ref", async () => {

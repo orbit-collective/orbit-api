@@ -315,3 +315,54 @@ export function validateUpdatePullRequestRequest(
 
     return result;
 }
+
+export interface CommentPullRequestInput {
+    repositoryId: number;
+
+    number: number;
+
+    body: string;
+}
+
+export function validateCommentRequest(
+    value: unknown,
+): CommentPullRequestInput {
+    if (
+        typeof value !== "object" ||
+        value === null
+    ) {
+        throw new ApiError(
+            "INVALID_REQUEST_BODY",
+            "Request body must be a JSON object.",
+            400,
+        );
+    }
+
+    const input = value as Record<string, unknown>;
+
+    if (
+        typeof input.body !== "string" ||
+        input.body.trim() === "" ||
+        input.body.length > 65536
+    ) {
+        throw new ApiError(
+            "INVALID_COMMENT_BODY",
+            "body must be a non-empty string of at most 65536 characters.",
+            400,
+        );
+    }
+
+    return {
+        repositoryId: positiveInteger(
+            input.repositoryId,
+            "INVALID_REPOSITORY_ID",
+            "repositoryId must be a positive integer.",
+        ),
+        number: positiveInteger(
+            input.number,
+            "INVALID_PULL_REQUEST_NUMBER",
+            "number must be a positive integer.",
+        ),
+        body: input.body,
+    };
+}

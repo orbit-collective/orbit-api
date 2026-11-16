@@ -230,6 +230,65 @@ export class DevelopmentService {
         };
     }
 
+    /**
+     * Comments on a pull request as the Orbit app, for what Orbit does to it
+     * outside a webhook (linking an issue to a pull request that already
+     * exists). The text is the caller's: orbit-api only vouches that the
+     * repository is the connection's.
+     */
+    public async commentOnPullRequest(
+        connection: GitHubConnection,
+        repositoryId: number,
+        number: number,
+        body: string,
+    ): Promise<{ id: number; url: string }> {
+        const { repository, token } =
+            await this.access.authorize(
+                connection,
+                repositoryId,
+            );
+
+        try {
+            const comment =
+                await this.client.createComment(
+                    token,
+                    repository.owner,
+                    repository.name,
+                    number,
+                    body,
+                );
+
+            return {
+                id: comment.id,
+                url: comment.html_url,
+            };
+        } catch (error) {
+            throw this.rejection(
+                error,
+                "GITHUB_COMMENT_REJECTED",
+            );
+        }
+    }
+
+    /** GitHub's own public message is safe to show; anything else is passed on as it is. */
+    private rejection(
+        error: unknown,
+        code: string,
+    ): unknown {
+        if (
+            error instanceof ApiError &&
+            error.githubMessage
+        ) {
+            return new ApiError(
+                code,
+                error.githubMessage,
+                422,
+            );
+        }
+
+        return error;
+    }
+
     public async getChecksBatch(
         connection: GitHubConnection,
         repositoryId: number,

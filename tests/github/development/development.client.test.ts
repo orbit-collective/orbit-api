@@ -48,6 +48,16 @@ describe("GitHubDevelopmentClient", () => {
         expect(githubRequest).toHaveBeenCalledWith(path, { token: "t" });
     });
 
+    it("posts a comment as an issue comment", async () => {
+        await client.createComment("t", "o", "r", 7, "Hi");
+
+        expect(githubRequest).toHaveBeenCalledWith("/repos/o/r/issues/7/comments", {
+            method: "POST",
+            token: "t",
+            body: { body: "Hi" },
+        });
+    });
+
     it("patches a pull request", async () => {
         await client.updatePullRequest("t", "o", "r", 5, { state: "closed" });
 
