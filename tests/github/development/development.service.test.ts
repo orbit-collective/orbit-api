@@ -23,6 +23,7 @@ const user = { login: "ada", avatar_url: "u" };
 
 function summary(number: number, state: "open" | "closed" = "open") {
     return {
+        id: number * 1000,
         number,
         title: `PR ${number}`,
         state,

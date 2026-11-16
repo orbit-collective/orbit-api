@@ -43,6 +43,7 @@ export function toPullRequest(
         pullRequest.merged_at !== null;
 
     return {
+        id: pullRequest.id,
         number: pullRequest.number,
         title: pullRequest.title,
         state: merged
