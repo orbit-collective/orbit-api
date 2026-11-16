@@ -23,6 +23,7 @@ import {
 } from "@/github/development/development-handler";
 
 import {
+    parsePagination,
     parseRepositoryId,
 } from "@/github/development/development-request.validator";
 
@@ -44,14 +45,20 @@ export default async function handler(
         return handleAuthenticated(
             request,
             "GET",
-            async (connection) => ({
-                branches: await new DevelopmentService().listBranches(
+            async (connection) => {
+                const params =
+                    new URL(request.url).searchParams;
+
+                const { page, perPage } =
+                    parsePagination(params, 10);
+
+                return new DevelopmentService().listBranches(
                     connection,
-                    parseRepositoryId(
-                        new URL(request.url).searchParams,
-                    ),
-                ),
-            }),
+                    parseRepositoryId(params),
+                    page,
+                    perPage,
+                );
+            },
         );
     }
 
