@@ -15,6 +15,8 @@ export interface GitHubLabel {
 }
 
 export interface GitHubPullRequestSummary {
+    id: number;
+
     number: number;
 
     title: string;

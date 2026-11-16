@@ -158,7 +158,7 @@ failed, so a CI problem never fails the list.
 ### Get one pull request
 `GET /pull-requests?repositoryId=1&number=7`
 
-A `PullRequest` plus `additions`, `deletions`, `changedFiles`,
+A `PullRequest` (with GitHub's numeric `id`, which is what Orbit keys links by) plus `additions`, `deletions`, `changedFiles`,
 `commitCount`, `commentCount`, `mergeableState`, `reviewState`
 (`approved` | `changes_requested` | `commented` | `none`), `reviews[]` and
 `commits[]`.

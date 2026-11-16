@@ -41,6 +41,9 @@ export type ReviewState =
     | "none";
 
 export interface PullRequestDto {
+    /** GitHub's own numeric id: what Orbit keys a linked pull request by. */
+    id: number;
+
     number: number;
 
     title: string;

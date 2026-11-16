@@ -23,6 +23,7 @@ function pullRequest(
     overrides: Partial<GitHubPullRequestSummary> = {},
 ): GitHubPullRequestSummary {
     return {
+        id: 9007,
         number: 7,
         title: "Add login",
         state: "open",
@@ -65,6 +66,7 @@ describe("toPullRequest", () => {
         const dto = toPullRequest(pullRequest());
 
         expect(dto).toMatchObject({
+            id: 9007,
             number: 7,
             state: "open",
             draft: false,
