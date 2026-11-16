@@ -15,6 +15,10 @@ import {
 } from "@/relay/repositories/repository.service";
 
 import {
+    clearBranchListCache,
+} from "@/github/development/development.service";
+
+import {
     GitHubBranchClient,
 } from "./branch.client";
 
@@ -150,6 +154,9 @@ export class BranchService {
 
             throw error;
         }
+
+        // A branch list remembered by this instance no longer has it.
+        clearBranchListCache();
 
         return {
             name: input.name,

@@ -26,6 +26,8 @@ import {
     parsePagination,
     parsePullRequestNumber,
     parsePullRequestState,
+    parseSince,
+    parseWithCi,
     parseRepositoryId,
 } from "@/github/development/development-request.validator";
 
@@ -67,15 +69,15 @@ export default async function handler(
 
                 const { page, perPage } = parsePagination(params);
 
-                return {
-                    pullRequests: await service.listPullRequests(
-                        connection,
-                        repositoryId,
-                        parsePullRequestState(params),
-                        page,
-                        perPage,
-                    ),
-                };
+                return service.listPullRequests(
+                    connection,
+                    repositoryId,
+                    parsePullRequestState(params),
+                    page,
+                    perPage,
+                    parseSince(params),
+                    parseWithCi(params),
+                );
             },
         );
     }

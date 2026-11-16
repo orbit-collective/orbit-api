@@ -145,15 +145,19 @@ only the shapes below do. A pull request's `state` is `open`, `closed` or
 `merged` (derived from `merged_at`).
 
 ### List pull requests
-`GET /pull-requests?repositoryId=1&state=open|closed|all&page=1&perPage=30`
+`GET /pull-requests?repositoryId=1&state=open|closed|all&page=1&perPage=100&since=2026-08-01&ci=none`
 
 ```ts
-{ "pullRequests": PullRequest[] }
+{ "pullRequests": PullRequest[], "hasMore": boolean }
 ```
 
-Open pull requests carry `ci` (see Checks), looked up for at most the first
-20 open ones of the page; it is `null` for the rest and whenever the lookup
-failed, so a CI problem never fails the list.
+Newest update first. `since` (an ISO date) keeps only what was updated since
+then, and `hasMore` says whether the next page can still hold more inside the
+range, so a client can read a time window page by page. Without
+`ci=none`, open pull requests carry `ci` (see Checks), looked up for at most
+the first 20 open ones of the page (two GitHub calls each, so slow); it is
+`null` for the rest and whenever the lookup failed. Ask for the CI of what is
+shown with `GET /checks?refs=` instead.
 
 ### Get one pull request
 `GET /pull-requests?repositoryId=1&number=7`
@@ -206,6 +210,10 @@ at most 100.
 
 Combines check runs and legacy commit statuses: `failed` if anything failed,
 `pending` if anything still runs, `passed` if all passed, `none` without CI.
+
+`GET /checks?repositoryId=1&refs=sha1,sha2` (at most 20) answers
+`{ "checks": { "sha1": Checks | null, ... } }`: one call for the pull
+requests on screen, a ref whose lookup failed is `null`.
 
 ### Insights
 `GET /insights?repositoryId=1`

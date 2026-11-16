@@ -166,3 +166,10 @@ export interface BranchPageDto {
 
     perPage: number;
 }
+
+export interface PullRequestPageDto {
+    pullRequests: PullRequestDto[];
+
+    /** Whether the next page may hold more pull requests inside the asked range. */
+    hasMore: boolean;
+}

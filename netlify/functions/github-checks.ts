@@ -12,6 +12,7 @@ import {
 
 import {
     parseRef,
+    parseRefs,
     parseRepositoryId,
 } from "@/github/development/development-request.validator";
 
@@ -25,11 +26,26 @@ export default async function handler(
         async (connection) => {
             const params = new URL(request.url).searchParams;
 
-            return new DevelopmentService().getChecks(
-                connection,
-                parseRepositoryId(params),
-                parseRef(params.get("ref"), "ref"),
-            );
+            const service = new DevelopmentService();
+
+            const repositoryId = parseRepositoryId(params);
+
+            const refs = parseRefs(params);
+
+            // `refs` asks for several commits at once, `ref` for one.
+            return refs
+                ? {
+                    checks: await service.getChecksBatch(
+                        connection,
+                        repositoryId,
+                        refs,
+                    ),
+                }
+                : service.getChecks(
+                    connection,
+                    repositoryId,
+                    parseRef(params.get("ref"), "ref"),
+                );
         },
     );
 }

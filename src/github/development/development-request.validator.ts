@@ -109,6 +109,90 @@ export function parsePullRequestState(
 /** A git ref (branch name or sha) used in a URL path: no whitespace or odd punctuation. */
 const VALID_REF = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
 
+/**
+ * `since` bounds a pull request list by last update: an ISO date or datetime
+ * (what the browser sends for "the last 90 days").
+ */
+export function parseSince(
+    params: URLSearchParams,
+): string | undefined {
+    const value = params.get("since");
+
+    if (value === null || value === "") {
+        return undefined;
+    }
+
+    const time = Date.parse(value);
+
+    if (
+        !Number.isFinite(time) ||
+        !/^\d{4}-\d{2}-\d{2}/.test(value)
+    ) {
+        throw new ApiError(
+            "INVALID_SINCE",
+            "since must be an ISO date.",
+            400,
+        );
+    }
+
+    return new Date(time).toISOString();
+}
+
+/** `ci=none` leaves the per-pull-request CI lookup out of a list (it is slow). */
+export function parseWithCi(
+    params: URLSearchParams,
+): boolean {
+    const mode = params.get("ci");
+
+    if (
+        mode !== null &&
+        mode !== "none" &&
+        mode !== "inline"
+    ) {
+        throw new ApiError(
+            "INVALID_CI_MODE",
+            "ci must be none or inline.",
+            400,
+        );
+    }
+
+    return mode !== "none";
+}
+
+const MAX_CHECK_REFS = 20;
+
+/** `refs` is a comma separated list of shas or branch names (at most 20). */
+export function parseRefs(
+    params: URLSearchParams,
+): string[] | null {
+    const value = params.get("refs");
+
+    if (value === null) {
+        return null;
+    }
+
+    const refs = [
+        ...new Set(
+            value
+                .split(",")
+                .filter((ref) => ref !== ""),
+        ),
+    ];
+
+    if (
+        refs.length === 0 ||
+        refs.length > MAX_CHECK_REFS
+    ) {
+        throw new ApiError(
+            "INVALID_REF",
+            `refs must name between 1 and ${MAX_CHECK_REFS} refs.`,
+            400,
+        );
+    }
+
+    return refs.map((ref) => parseRef(ref, "refs"));
+}
+
 export function parseRef(
     value: string | null,
     field: string,

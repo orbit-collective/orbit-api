@@ -9,6 +9,9 @@ import {
     parsePagination,
     parsePullRequestNumber,
     parsePullRequestState,
+    parseRefs,
+    parseSince,
+    parseWithCi,
     parseRef,
     parseRepositoryId,
     validateUpdatePullRequestRequest,
@@ -70,6 +73,44 @@ describe("query parsing", () => {
                 expect.objectContaining({ code: "INVALID_REF" }),
             );
         }
+    });
+});
+
+describe("list options", () => {
+    it("reads since as an ISO date and rejects anything else", () => {
+        expect(parseSince(params(""))).toBeUndefined();
+        expect(parseSince(params("since="))).toBeUndefined();
+        expect(parseSince(params("since=2026-01-05"))).toBe("2026-01-05T00:00:00.000Z");
+        expect(() => parseSince(params("since=yesterday"))).toThrow(
+            expect.objectContaining({ code: "INVALID_SINCE" }),
+        );
+        expect(() => parseSince(params("since=12345"))).toThrow(
+            expect.objectContaining({ code: "INVALID_SINCE" }),
+        );
+    });
+
+    it("looks CI up inline unless told not to", () => {
+        expect(parseWithCi(params(""))).toBe(true);
+        expect(parseWithCi(params("ci=inline"))).toBe(true);
+        expect(parseWithCi(params("ci=none"))).toBe(false);
+        expect(() => parseWithCi(params("ci=maybe"))).toThrow(
+            expect.objectContaining({ code: "INVALID_CI_MODE" }),
+        );
+    });
+
+    it("reads a list of refs, without duplicates, at most twenty", () => {
+        expect(parseRefs(params(""))).toBeNull();
+        expect(parseRefs(params("refs=abc,def,abc"))).toEqual(["abc", "def"]);
+        expect(() => parseRefs(params("refs="))).toThrow(
+            expect.objectContaining({ code: "INVALID_REF" }),
+        );
+        const many = Array.from({ length: 21 }, (_, i) => `r${i}`).join(",");
+        expect(() => parseRefs(params(`refs=${many}`))).toThrow(
+            expect.objectContaining({ code: "INVALID_REF" }),
+        );
+        expect(() => parseRefs(params("refs=a b,c"))).toThrow(
+            expect.objectContaining({ code: "INVALID_REF" }),
+        );
     });
 });
 
