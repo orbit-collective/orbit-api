@@ -6,6 +6,10 @@ import {
     mapWithConcurrency,
 } from "@/shared/concurrency";
 
+import {
+    TtlCache,
+} from "@/shared/ttl-cache";
+
 import type {
     GitHubConnection,
 } from "@/relay/connections/connection.model";
@@ -17,10 +21,12 @@ import {
 } from "./development.client";
 
 import type {
+    BranchDto,
     BranchPageDto,
     CiSummaryDto,
     CommitDto,
     InsightsDto,
+    PullRequestPageDto,
     PullRequestDetailDto,
     PullRequestDto,
 } from "./development.dto";
@@ -44,6 +50,11 @@ import {
 /** Most pages of branches read (a thousand branches): a repository past that is cut, not slow. */
 const MAX_BRANCH_PAGES = 10;
 
+/** A repository's whole branch list is reused this long by a warm instance. */
+const BRANCH_LIST_TTL_MS = 60 * 1000;
+
+const branchLists = new TtlCache<BranchDto[]>();
+
 /** How many open pull requests of a list get their CI looked up, and how many at once. */
 const CI_LOOKUP_LIMIT = 20;
 const CI_LOOKUP_CONCURRENCY = 5;
@@ -66,6 +77,11 @@ export interface UpdatePullRequestInput {
  * first; GitHub's own payloads never leave this class, only the DTOs of
  * development.dto.ts do.
  */
+/** Drops the remembered branch lists (a branch was just created). */
+export function clearBranchListCache(): void {
+    branchLists.clear();
+}
+
 export class DevelopmentService {
     public constructor(
         private readonly access =
@@ -75,20 +91,30 @@ export class DevelopmentService {
         new GitHubDevelopmentClient(),
     ) {}
 
+    /**
+     * One page of a repository's pull requests, newest update first. With
+     * `since` the page keeps only what was updated since then, and
+     * `hasMore` says whether reading the next page can still find more (a full
+     * page whose oldest entry is still inside the range). CI is looked up here
+     * only on request (`withCi`): it costs two GitHub calls per open pull
+     * request, which is why the browser asks for it separately.
+     */
     public async listPullRequests(
         connection: GitHubConnection,
         repositoryId: number,
         state: PullRequestListState,
         page: number,
         perPage: number,
-    ): Promise<PullRequestDto[]> {
+        since?: string,
+        withCi = true,
+    ): Promise<PullRequestPageDto> {
         const { repository, token } =
             await this.access.authorize(
                 connection,
                 repositoryId,
             );
 
-        const pullRequests =
+        const raw =
             await this.client.listPullRequests(
                 token,
                 repository.owner,
@@ -98,41 +124,95 @@ export class DevelopmentService {
                 perPage,
             );
 
-        const openOnes = pullRequests
-            .filter(
-                (pullRequest) =>
-                    pullRequest.state === "open",
-            )
-            .slice(0, CI_LOOKUP_LIMIT);
+        const inRange = (updatedAt: string) =>
+            since === undefined ||
+            Date.parse(updatedAt) >= Date.parse(since);
+
+        const pullRequests = raw.filter(
+            (pullRequest) =>
+                inRange(pullRequest.updated_at),
+        );
+
+        const last = raw[raw.length - 1];
+
+        const hasMore =
+            raw.length === perPage &&
+            last !== undefined &&
+            inRange(last.updated_at);
 
         const summaries = new Map<
             number,
             CiSummaryDto | null
         >();
 
-        await mapWithConcurrency(
-            openOnes,
-            CI_LOOKUP_CONCURRENCY,
-            async (pullRequest) => {
-                summaries.set(
-                    pullRequest.number,
-                    await this.ciOrNull(
-                        token,
-                        repository.owner,
-                        repository.name,
-                        pullRequest.head.sha,
+        if (withCi) {
+            await mapWithConcurrency(
+                pullRequests
+                    .filter(
+                        (pullRequest) =>
+                            pullRequest.state === "open",
+                    )
+                    .slice(0, CI_LOOKUP_LIMIT),
+                CI_LOOKUP_CONCURRENCY,
+                async (pullRequest) => {
+                    summaries.set(
+                        pullRequest.number,
+                        await this.ciOrNull(
+                            token,
+                            repository.owner,
+                            repository.name,
+                            pullRequest.head.sha,
+                        ),
+                    );
+                },
+            );
+        }
+
+        return {
+            pullRequests: pullRequests.map(
+                (pullRequest) =>
+                    toPullRequest(
+                        pullRequest,
+                        summaries.get(pullRequest.number) ??
+                        null,
                     ),
+            ),
+            hasMore,
+        };
+    }
+
+    /**
+     * CI of several commits in one call (the browser asks for the pull
+     * requests it is showing). A ref whose lookup failed is null, never an
+     * error for the others.
+     */
+    public async getChecksBatch(
+        connection: GitHubConnection,
+        repositoryId: number,
+        refs: string[],
+    ): Promise<Record<string, CiSummaryDto | null>> {
+        const { repository, token } =
+            await this.access.authorize(
+                connection,
+                repositoryId,
+            );
+
+        const checks: Record<string, CiSummaryDto | null> = {};
+
+        await mapWithConcurrency(
+            refs,
+            CI_LOOKUP_CONCURRENCY,
+            async (ref) => {
+                checks[ref] = await this.ciOrNull(
+                    token,
+                    repository.owner,
+                    repository.name,
+                    ref,
                 );
             },
         );
 
-        return pullRequests.map((pullRequest) =>
-            toPullRequest(
-                pullRequest,
-                summaries.get(pullRequest.number) ??
-                null,
-            ),
-        );
+        return checks;
     }
 
     public async getPullRequest(
@@ -288,43 +368,56 @@ export class DevelopmentService {
                 repositoryId,
             );
 
-        const details =
-            await this.client.getRepository(
-                token,
-                repository.owner,
-                repository.name,
-            );
+        // The whole sorted list is what costs (up to ten GitHub pages plus the
+        // repository itself), and every page of it is cut from the same one,
+        // so a warm instance keeps it for a minute across page changes.
+        const sorted = await branchLists.remember(
+            `${repository.repositoryId}`,
+            BRANCH_LIST_TTL_MS,
+            async () => {
+                const details =
+                    await this.client.getRepository(
+                        token,
+                        repository.owner,
+                        repository.name,
+                    );
 
-        const all: GitHubBranchSummary[] = [];
+                const all: GitHubBranchSummary[] = [];
 
-        for (let current = 1; current <= MAX_BRANCH_PAGES; current++) {
-            const batch =
-                await this.client.listBranches(
-                    token,
-                    repository.owner,
-                    repository.name,
-                    current,
-                );
+                for (
+                    let current = 1;
+                    current <= MAX_BRANCH_PAGES;
+                    current++
+                ) {
+                    const batch =
+                        await this.client.listBranches(
+                            token,
+                            repository.owner,
+                            repository.name,
+                            current,
+                        );
 
-            all.push(...batch);
+                    all.push(...batch);
 
-            if (batch.length < BRANCHES_PAGE_SIZE) {
-                break;
-            }
-        }
+                    if (batch.length < BRANCHES_PAGE_SIZE) {
+                        break;
+                    }
+                }
 
-        const sorted = all
-            .map((branch) =>
-                toBranch(
-                    branch,
-                    details.default_branch,
-                ),
-            )
-            .sort(
-                (a, b) =>
-                    Number(b.isDefault) -
-                    Number(a.isDefault),
-            );
+                return all
+                    .map((branch) =>
+                        toBranch(
+                            branch,
+                            details.default_branch,
+                        ),
+                    )
+                    .sort(
+                        (x, y) =>
+                            Number(y.isDefault) -
+                            Number(x.isDefault),
+                    );
+            },
+        );
 
         return {
             branches: sorted.slice(

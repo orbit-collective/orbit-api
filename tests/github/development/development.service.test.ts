@@ -1,4 +1,5 @@
 import {
+    beforeEach,
     describe,
     expect,
     it,
@@ -6,6 +7,7 @@ import {
 } from "vitest";
 
 import {
+    clearBranchListCache,
     DevelopmentService,
 } from "@/github/development/development.service";
 
@@ -82,6 +84,10 @@ function makeService(clientOverrides: Record<string, unknown> = {}) {
     };
 }
 
+beforeEach(() => {
+    clearBranchListCache();
+});
+
 describe("DevelopmentService", () => {
     it("authorises the repository before anything else", async () => {
         const { service, access, client } = makeService();
@@ -105,7 +111,7 @@ describe("DevelopmentService", () => {
 
         const result = await service.listPullRequests(connection, 1, "all", 1, 30);
 
-        expect(result.map((pr) => pr.ci?.state ?? null)).toEqual(["none", null]);
+        expect(result.pullRequests.map((pr) => pr.ci?.state ?? null)).toEqual(["none", null]);
         expect(client.getCheckRuns).toHaveBeenCalledTimes(1);
         expect(client.getCheckRuns).toHaveBeenCalledWith("tok", "o", "r", "sha1");
     });
@@ -118,7 +124,7 @@ describe("DevelopmentService", () => {
                 .mockRejectedValue(new ApiError("GITHUB_API_ERROR", "x", 502)),
         });
 
-        const [pr] = await service.listPullRequests(connection, 1, "open", 1, 30);
+        const { pullRequests: [pr] } = await service.listPullRequests(connection, 1, "open", 1, 30);
 
         expect(pr?.ci).toBeNull();
     });
@@ -132,6 +138,66 @@ describe("DevelopmentService", () => {
         await service.listPullRequests(connection, 1, "open", 1, 30);
 
         expect(client.getCheckRuns).toHaveBeenCalledTimes(20);
+    });
+
+    it("leaves CI out of a list on request, so the list does not wait for it", async () => {
+        const { service, client } = makeService({
+            listPullRequests: vi.fn().mockResolvedValue([summary(1)]),
+        });
+
+        const result = await service.listPullRequests(connection, 1, "open", 1, 30, undefined, false);
+
+        expect(result.pullRequests[0]?.ci).toBeNull();
+        expect(client.getCheckRuns).not.toHaveBeenCalled();
+    });
+
+    it("keeps only what was updated since the date and says whether more may follow", async () => {
+        const at = (day: number) => `2026-01-${String(day).padStart(2, "0")}T00:00:00Z`;
+        const dated = (n: number, day: number) => ({ ...summary(n), updated_at: at(day) });
+        const { service } = makeService({
+            listPullRequests: vi.fn().mockResolvedValue([dated(1, 20), dated(2, 12), dated(3, 5)]),
+        });
+
+        const full = await service.listPullRequests(connection, 1, "all", 1, 3, at(10), false);
+
+        // A full page whose oldest entry is already out of range is the last one.
+        expect(full.pullRequests.map((pr) => pr.number)).toEqual([1, 2]);
+        expect(full.hasMore).toBe(false);
+
+        const inside = await service.listPullRequests(connection, 1, "all", 1, 3, at(1), false);
+
+        expect(inside.pullRequests).toHaveLength(3);
+        expect(inside.hasMore).toBe(true);
+
+        const short = await service.listPullRequests(connection, 1, "all", 1, 10, at(1), false);
+
+        expect(short.hasMore).toBe(false);
+    });
+
+    it("has more whenever a full page comes back without a range", async () => {
+        const { service } = makeService({
+            listPullRequests: vi.fn().mockResolvedValue([summary(1), summary(2)]),
+        });
+
+        expect((await service.listPullRequests(connection, 1, "all", 1, 2, undefined, false)).hasMore).toBe(true);
+        expect((await service.listPullRequests(connection, 1, "all", 1, 3, undefined, false)).hasMore).toBe(false);
+    });
+
+    it("reads CI of several refs at once, and a failing one is null", async () => {
+        const { service } = makeService({
+            getCheckRuns: vi.fn(async (_t: string, _o: string, _r: string, ref: string) => {
+                if (ref === "bad") {
+                    throw new ApiError("GITHUB_API_ERROR", "x", 502);
+                }
+
+                return { total_count: 0, check_runs: [] };
+            }),
+        });
+
+        const checks = await service.getChecksBatch(connection, 1, ["a", "bad"]);
+
+        expect(checks.a?.state).toBe("none");
+        expect(checks.bad).toBeNull();
     });
 
     it("returns one pull request in detail with reviews, commits and CI", async () => {
@@ -271,12 +337,30 @@ describe("DevelopmentService", () => {
         const first = await service.listBranches(connection, 1, 1, 6);
         const last = await service.listBranches(connection, 1, 17, 6);
 
-        expect(listBranches).toHaveBeenCalledTimes(2 * 2);
+        // Two GitHub pages, read once and cut for both requested pages.
+        expect(listBranches).toHaveBeenCalledTimes(2);
         expect(first.total).toBe(101);
         // The default branch (on the second GitHub page) still comes first.
         expect(first.branches[0]?.name).toBe("main");
         expect(first.branches).toHaveLength(6);
         expect(last.branches).toHaveLength(5);
+    });
+
+    it("reuses the branch list across pages for a moment", async () => {
+        const listBranches = vi.fn().mockResolvedValue([
+            { name: "main", protected: true, commit: { sha: "m" } },
+        ]);
+        const { service, client } = makeService({ listBranches });
+
+        await service.listBranches(connection, 1, 1, 6);
+        await service.listBranches(connection, 1, 2, 6);
+
+        expect(listBranches).toHaveBeenCalledTimes(1);
+        expect(client.getRepository).toHaveBeenCalledTimes(1);
+
+        clearBranchListCache();
+        await service.listBranches(connection, 1, 1, 6);
+        expect(listBranches).toHaveBeenCalledTimes(2);
     });
 
     it("stops reading branches after a safety cap of pages", async () => {
