@@ -58,6 +58,7 @@ function makeService(clientOverrides: Record<string, unknown> = {}) {
         updatePullRequest: vi.fn(),
         listCommits: vi.fn().mockResolvedValue([]),
         listBranches: vi.fn().mockResolvedValue([]),
+        listIssues: vi.fn().mockResolvedValue([]),
         getRepository: vi.fn().mockResolvedValue({
             full_name: "o/r",
             description: "d",
@@ -376,6 +377,45 @@ describe("DevelopmentService", () => {
 
         expect(listBranches).toHaveBeenCalledTimes(10);
         expect(page.total).toBe(1000);
+    });
+
+    it("lists issues without the pull requests GitHub mixes in, and pages by GitHub's own page", async () => {
+        const issue = (number: number, extra: object = {}) => ({
+            id: number * 10,
+            number,
+            title: `Issue ${number}`,
+            state: "open",
+            html_url: `https://github.com/o/r/issues/${number}`,
+            body: null,
+            user,
+            labels: [{ name: "bug", color: "ff0000" }, "plain"],
+            assignees: [user],
+            comments: 2,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-02T00:00:00Z",
+            closed_at: null,
+            ...extra,
+        });
+        const { service, client } = makeService({
+            listIssues: vi.fn().mockResolvedValue([
+                issue(1),
+                issue(2, { pull_request: {} }),
+            ]),
+        });
+
+        const page = await service.listIssues(connection, 1, "open", 1, 2, "2026-01-01T00:00:00.000Z");
+
+        expect(page.issues.map((i) => i.number)).toEqual([1]);
+        expect(page.issues[0]).toMatchObject({
+            title: "Issue 1",
+            commentCount: 2,
+            author: { login: "ada" },
+            labels: [{ name: "bug", color: "ff0000" }, { name: "plain", color: "757575" }],
+            assignees: [{ login: "ada" }],
+        });
+        // Two came back for a page of two: there may be more, though one was a pull request.
+        expect(page.hasMore).toBe(true);
+        expect(client.listIssues).toHaveBeenCalledWith("tok", "o", "r", "open", 1, 2, "2026-01-01T00:00:00.000Z");
     });
 
     it("reports checks for a ref", async () => {

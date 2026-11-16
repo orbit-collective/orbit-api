@@ -173,3 +173,36 @@ export interface PullRequestPageDto {
     /** Whether the next page may hold more pull requests inside the asked range. */
     hasMore: boolean;
 }
+
+export interface IssueDto {
+    id: number;
+
+    number: number;
+
+    title: string;
+
+    state: "open" | "closed";
+
+    url: string;
+
+    author: PersonDto | null;
+
+    labels: Array<{ name: string; color: string }>;
+
+    assignees: PersonDto[];
+
+    commentCount: number;
+
+    createdAt: string;
+
+    updatedAt: string;
+
+    closedAt: string | null;
+}
+
+export interface IssuePageDto {
+    issues: IssueDto[];
+
+    /** Whether the next page may hold more (a full page of issues came back). */
+    hasMore: boolean;
+}

@@ -7,6 +7,7 @@ import type {
     GitHubCheckRunsResponse,
     GitHubCombinedStatus,
     GitHubCommit,
+    GitHubIssue,
     GitHubCommitActivityWeek,
     GitHubContributor,
     GitHubPullRequestDetail,
@@ -140,6 +141,30 @@ export class GitHubDevelopmentClient {
     ): Promise<GitHubBranchSummary[]> {
         return githubRequest<GitHubBranchSummary[]>(
             `${repositoryPath(owner, name)}/branches?per_page=${BRANCHES_PAGE_SIZE}&page=${page}`,
+            { token },
+        );
+    }
+
+    /**
+     * Issues of the repository, newest update first. GitHub's issues list also
+     * holds pull requests; the caller filters those out.
+     */
+    public listIssues(
+        token: string,
+        owner: string,
+        name: string,
+        state: PullRequestListState,
+        page: number,
+        perPage: number,
+        since?: string,
+    ): Promise<GitHubIssue[]> {
+        const sinceQuery =
+            since === undefined
+                ? ""
+                : `&since=${encodeURIComponent(since)}`;
+
+        return githubRequest<GitHubIssue[]>(
+            `${repositoryPath(owner, name)}/issues?state=${state}&sort=updated&direction=desc&per_page=${perPage}&page=${page}${sinceQuery}`,
             { token },
         );
     }

@@ -115,3 +115,9 @@
   to = "/.netlify/functions/github-pull-request-update"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/issues"
+  to = "/.netlify/functions/github-issues"
+  status = 200
+  force = true

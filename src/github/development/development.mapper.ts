@@ -4,6 +4,7 @@ import type {
     CiState,
     CiSummaryDto,
     CommitDto,
+    IssueDto,
     PersonDto,
     PullRequestDetailDto,
     PullRequestDto,
@@ -16,6 +17,7 @@ import type {
     GitHubCheckRunsResponse,
     GitHubCombinedStatus,
     GitHubCommit,
+    GitHubIssue,
     GitHubPullRequestDetail,
     GitHubPullRequestSummary,
     GitHubReview,
@@ -316,5 +318,34 @@ export function summariseCi(
         failed,
         pending,
         runs,
+    };
+}
+
+export function toIssue(
+    issue: GitHubIssue,
+): IssueDto {
+    return {
+        id: issue.id,
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        url: issue.html_url,
+        author: toPerson(issue.user),
+        labels: issue.labels.map((label) =>
+            typeof label === "string"
+                ? { name: label, color: "757575" }
+                : { name: label.name, color: label.color },
+        ),
+        assignees: (issue.assignees ?? []).flatMap(
+            (assignee) => {
+                const person = toPerson(assignee);
+
+                return person ? [person] : [];
+            },
+        ),
+        commentCount: issue.comments,
+        createdAt: issue.created_at,
+        updatedAt: issue.updated_at,
+        closedAt: issue.closed_at,
     };
 }

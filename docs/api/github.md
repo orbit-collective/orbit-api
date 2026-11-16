@@ -178,6 +178,20 @@ At least one of `state`, `title`, `body`. Closing never merges. Orbit uses
 `body` to add or drop `<!-- orbit-issue:ID -->` markers. GitHub's own
 validation message is returned as `GITHUB_PULL_REQUEST_REJECTED`.
 
+### List issues
+`GET /issues?repositoryId=1&state=open|closed|all&page=1&perPage=30&since=2026-08-01`
+
+```ts
+{ "issues": [{ "id", "number", "title", "state", "url", "author": Person | null,
+               "labels": [{ "name", "color" }], "assignees": Person[],
+               "commentCount", "createdAt", "updatedAt", "closedAt" }],
+  "hasMore": boolean }
+```
+
+GitHub issues of the repository (its pull requests are left out), newest
+update first. GitHub's list mixes issues and pull requests, so a page may hold
+fewer issues than `perPage`; `hasMore` follows GitHub's own page.
+
 ### List commits
 `GET /commits?repositoryId=1&branch=main&page=1&perPage=30`
 

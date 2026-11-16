@@ -33,6 +33,8 @@ describe("GitHubDevelopmentClient", () => {
         ["listCommits", ["t", "o", "r", "feat/x", 1, 20], "/repos/o/r/commits?per_page=20&page=1&sha=feat%2Fx"],
         ["listBranches", ["t", "o", "r"], "/repos/o/r/branches?per_page=100&page=1"],
         ["listBranches", ["t", "o", "r", 3], "/repos/o/r/branches?per_page=100&page=3"],
+        ["listIssues", ["t", "o", "r", "open", 2, 30], "/repos/o/r/issues?state=open&sort=updated&direction=desc&per_page=30&page=2"],
+        ["listIssues", ["t", "o", "r", "all", 1, 10, "2026-01-01T00:00:00.000Z"], "/repos/o/r/issues?state=all&sort=updated&direction=desc&per_page=10&page=1&since=2026-01-01T00%3A00%3A00.000Z"],
         ["getCheckRuns", ["t", "o", "r", "abc"], "/repos/o/r/commits/abc/check-runs?per_page=100"],
         ["getCombinedStatus", ["t", "o", "r", "abc"], "/repos/o/r/commits/abc/status"],
         ["listContributors", ["t", "o", "r"], "/repos/o/r/contributors?per_page=10"],
