@@ -192,6 +192,19 @@ GitHub issues of the repository (its pull requests are left out), newest
 update first. GitHub's list mixes issues and pull requests, so a page may hold
 fewer issues than `perPage`; `hasMore` follows GitHub's own page.
 
+### Comment on a pull request
+`POST /pull-request-comment`
+
+```ts
+{ "repositoryId": 1, "number": 7, "body": "Synced with Orbit ..." }  // -> { "id", "url" }
+```
+
+Posts a comment as the Orbit app on a pull request of the connection's
+repository, for what Orbit does outside a webhook (linking an issue to an
+existing pull request). Unlike `POST /comments` it is not tied to a relay
+event, so it is not deduplicated: the caller posts once per action. GitHub's
+own message comes back as `GITHUB_COMMENT_REJECTED`.
+
 ### List commits
 `GET /commits?repositoryId=1&branch=main&page=1&perPage=30`
 

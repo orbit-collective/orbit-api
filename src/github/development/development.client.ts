@@ -169,6 +169,24 @@ export class GitHubDevelopmentClient {
         );
     }
 
+    /** A comment on a pull request (they are issues to GitHub's comments API). */
+    public createComment(
+        token: string,
+        owner: string,
+        name: string,
+        number: number,
+        body: string,
+    ): Promise<{ id: number; html_url: string }> {
+        return githubRequest<{ id: number; html_url: string }>(
+            `${repositoryPath(owner, name)}/issues/${number}/comments`,
+            {
+                method: "POST",
+                token,
+                body: { body },
+            },
+        );
+    }
+
     public getCheckRuns(
         token: string,
         owner: string,
