@@ -134,6 +134,88 @@ and are deleted lazily, a bounded batch at a time, whenever the connection
 lists its pending events; acknowledging an event that has already been
 deleted therefore returns `EVENT_NOT_FOUND` instead of `EVENT_EXPIRED`.
 
+## Development panel endpoints
+
+Read models behind the Development view of a project in Orbit. All of them
+require `Authorization: Bearer <token>`, take the repository as
+`repositoryId` (it must be one of the connection's own repositories,
+otherwise `GITHUB_REPOSITORY_NOT_ALLOWED`) and answer in the usual
+`{ success, data }` envelope. GitHub's own payloads never leave orbit-api,
+only the shapes below do. A pull request's `state` is `open`, `closed` or
+`merged` (derived from `merged_at`).
+
+### List pull requests
+`GET /pull-requests?repositoryId=1&state=open|closed|all&page=1&perPage=30`
+
+```ts
+{ "pullRequests": PullRequest[] }
+```
+
+Open pull requests carry `ci` (see Checks), looked up for at most the first
+20 open ones of the page; it is `null` for the rest and whenever the lookup
+failed, so a CI problem never fails the list.
+
+### Get one pull request
+`GET /pull-requests?repositoryId=1&number=7`
+
+A `PullRequest` plus `additions`, `deletions`, `changedFiles`,
+`commitCount`, `commentCount`, `mergeableState`, `reviewState`
+(`approved` | `changes_requested` | `commented` | `none`), `reviews[]` and
+`commits[]`.
+
+### Update a pull request
+`POST /pull-request-update`
+
+```ts
+{ "repositoryId": 1, "number": 7, "state"?: "open" | "closed", "title"?: string, "body"?: string }
+```
+
+At least one of `state`, `title`, `body`. Closing never merges. Orbit uses
+`body` to add or drop `<!-- orbit-issue:ID -->` markers. GitHub's own
+validation message is returned as `GITHUB_PULL_REQUEST_REJECTED`.
+
+### List commits
+`GET /commits?repositoryId=1&branch=main&page=1&perPage=30`
+
+```ts
+{ "commits": [{ "sha", "message", "url", "authorName", "author": Person | null, "committedAt" }] }
+```
+
+`message` is the subject line only; `branch` is optional (default branch).
+
+### List branches
+`GET /branches?repositoryId=1`
+
+```ts
+{ "branches": [{ "name", "sha", "protected", "isDefault" }] }
+```
+
+The default branch comes first.
+
+### Checks (CI)
+`GET /checks?repositoryId=1&ref=<branch-or-sha>`
+
+```ts
+{ "state": "passed" | "failed" | "pending" | "none", "total", "passed", "failed", "pending",
+  "runs": [{ "name", "state", "url", "durationSeconds" }] }
+```
+
+Combines check runs and legacy commit statuses: `failed` if anything failed,
+`pending` if anything still runs, `passed` if all passed, `none` without CI.
+
+### Insights
+`GET /insights?repositoryId=1`
+
+```ts
+{ "repository": { "fullName", "description", "url", "private", "defaultBranch", "stars", "forks", "pushedAt" },
+  "contributors": [{ "login", "avatarUrl", "contributions", "url" }],
+  "languages": [{ "name", "bytes" }],
+  "commitActivity": [{ "weekStart": "YYYY-MM-DD", "total": 4 }] }
+```
+
+The three statistics are best-effort: GitHub computes commit activity on the
+first request, so they may be empty until a later call.
+
 ### Error format
 ```ts
 {
@@ -164,3 +246,7 @@ Stable error codes currently used by the GitHub API:
 | `INVALID_GITHUB_SIGNATURE` | Webhook HMAC verification failed. |
 | `INVALID_WEBHOOK_PAYLOAD` | Webhook body is not valid JSON. |
 | `GITHUB_API_ERROR` | An upstream GitHub API request failed. |
+| `GITHUB_REPOSITORY_NOT_ALLOWED` | The repository is not one of this connection's. |
+| `GITHUB_PULL_REQUEST_REJECTED` | GitHub refused the pull request change; the message is GitHub's own. |
+| `INVALID_REPOSITORY_ID` / `INVALID_PULL_REQUEST_NUMBER` / `INVALID_PULL_REQUEST_STATE` / `INVALID_REF` / `INVALID_PAGE` / `INVALID_PER_PAGE` | A query parameter is malformed. |
+| `NOTHING_TO_UPDATE` | A pull request update named none of state, title or body. |
