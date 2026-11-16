@@ -17,6 +17,7 @@ import type {
 import {
     BRANCHES_PAGE_SIZE,
     GitHubDevelopmentClient,
+    type MergeMethod,
     type PullRequestListState,
 } from "./development.client";
 
@@ -60,6 +61,21 @@ const branchLists = new TtlCache<BranchDto[]>();
 /** How many open pull requests of a list get their CI looked up, and how many at once. */
 const CI_LOOKUP_LIMIT = 20;
 const CI_LOOKUP_CONCURRENCY = 5;
+
+export interface MergePullRequestInput {
+    repositoryId: number;
+
+    number: number;
+
+    method: MergeMethod;
+
+    commitTitle?: string;
+
+    commitMessage?: string;
+
+    /** The head commit the person looked at; GitHub refuses if it moved. */
+    expectedHeadSha?: string;
+}
 
 export interface UpdatePullRequestInput {
     repositoryId: number;
@@ -287,6 +303,50 @@ export class DevelopmentService {
         }
 
         return error;
+    }
+
+    /**
+     * Merges a pull request with the chosen method. `expectedHeadSha` makes
+     * GitHub refuse (409) when the branch moved since the person looked, so
+     * nobody merges commits they have not seen. GitHub's own message (why it
+     * is not mergeable) comes back as GITHUB_PULL_REQUEST_REJECTED.
+     */
+    public async mergePullRequest(
+        connection: GitHubConnection,
+        input: MergePullRequestInput,
+    ): Promise<{ merged: boolean; sha: string; message: string }> {
+        const { repository, token } =
+            await this.access.authorize(
+                connection,
+                input.repositoryId,
+            );
+
+        try {
+            const result =
+                await this.client.mergePullRequest(
+                    token,
+                    repository.owner,
+                    repository.name,
+                    input.number,
+                    {
+                        method: input.method,
+                        ...(input.commitTitle !== undefined && { commitTitle: input.commitTitle }),
+                        ...(input.commitMessage !== undefined && { commitMessage: input.commitMessage }),
+                        ...(input.expectedHeadSha !== undefined && { expectedHeadSha: input.expectedHeadSha }),
+                    },
+                );
+
+            return {
+                merged: result.merged,
+                sha: result.sha,
+                message: result.message,
+            };
+        } catch (error) {
+            throw this.rejection(
+                error,
+                "GITHUB_PULL_REQUEST_REJECTED",
+            );
+        }
     }
 
     public async getChecksBatch(

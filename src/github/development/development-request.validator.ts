@@ -7,6 +7,7 @@ import type {
 } from "./development.client";
 
 import type {
+    MergePullRequestInput,
     UpdatePullRequestInput,
 } from "./development.service";
 
@@ -365,4 +366,101 @@ export function validateCommentRequest(
         ),
         body: input.body,
     };
+}
+
+const MERGE_METHODS = [
+    "merge",
+    "squash",
+    "rebase",
+] as const;
+
+export function validateMergeRequest(
+    value: unknown,
+): MergePullRequestInput {
+    if (
+        typeof value !== "object" ||
+        value === null
+    ) {
+        throw new ApiError(
+            "INVALID_REQUEST_BODY",
+            "Request body must be a JSON object.",
+            400,
+        );
+    }
+
+    const input = value as Record<string, unknown>;
+
+    if (
+        !MERGE_METHODS.includes(
+            input.method as (typeof MERGE_METHODS)[number],
+        )
+    ) {
+        throw new ApiError(
+            "INVALID_MERGE_METHOD",
+            "method must be merge, squash or rebase.",
+            400,
+        );
+    }
+
+    const result: MergePullRequestInput = {
+        repositoryId: positiveInteger(
+            input.repositoryId,
+            "INVALID_REPOSITORY_ID",
+            "repositoryId must be a positive integer.",
+        ),
+        number: positiveInteger(
+            input.number,
+            "INVALID_PULL_REQUEST_NUMBER",
+            "number must be a positive integer.",
+        ),
+        method: input.method as (typeof MERGE_METHODS)[number],
+    };
+
+    if (input.commitTitle !== undefined) {
+        if (
+            typeof input.commitTitle !== "string" ||
+            input.commitTitle.trim() === "" ||
+            input.commitTitle.length > 256
+        ) {
+            throw new ApiError(
+                "INVALID_COMMIT_TITLE",
+                "commitTitle must be a non-empty string of at most 256 characters.",
+                400,
+            );
+        }
+
+        result.commitTitle = input.commitTitle;
+    }
+
+    if (input.commitMessage !== undefined) {
+        if (
+            typeof input.commitMessage !== "string" ||
+            input.commitMessage.length > 65536
+        ) {
+            throw new ApiError(
+                "INVALID_COMMIT_MESSAGE",
+                "commitMessage must be a string of at most 65536 characters.",
+                400,
+            );
+        }
+
+        result.commitMessage = input.commitMessage;
+    }
+
+    if (input.expectedHeadSha !== undefined) {
+        if (
+            typeof input.expectedHeadSha !== "string" ||
+            !/^[0-9a-f]{7,40}$/i.test(input.expectedHeadSha)
+        ) {
+            throw new ApiError(
+                "INVALID_HEAD_SHA",
+                "expectedHeadSha must be a commit sha.",
+                400,
+            );
+        }
+
+        result.expectedHeadSha = input.expectedHeadSha;
+    }
+
+    return result;
 }

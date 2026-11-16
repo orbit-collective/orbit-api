@@ -15,6 +15,7 @@ import {
     parseRef,
     parseRepositoryId,
     validateCommentRequest,
+    validateMergeRequest,
     validateUpdatePullRequestRequest,
 } from "@/github/development/development-request.validator";
 
@@ -171,5 +172,36 @@ describe("validateCommentRequest", () => {
         [{ repositoryId: 1, body: "Hi" }, "INVALID_PULL_REQUEST_NUMBER"],
     ])("rejects %j", (body, code) => {
         expect(() => validateCommentRequest(body)).toThrow(expect.objectContaining({ code }));
+    });
+});
+
+describe("validateMergeRequest", () => {
+    const base = { repositoryId: 1, number: 2 };
+
+    it("accepts each method with the optional commit details", () => {
+        expect(validateMergeRequest({ ...base, method: "rebase" })).toEqual({ ...base, method: "rebase" });
+        expect(
+            validateMergeRequest({
+                ...base,
+                method: "squash",
+                commitTitle: "T",
+                commitMessage: "",
+                expectedHeadSha: "ABCDEF1",
+            }),
+        ).toEqual({ ...base, method: "squash", commitTitle: "T", commitMessage: "", expectedHeadSha: "ABCDEF1" });
+    });
+
+    it.each([
+        [null, "INVALID_REQUEST_BODY"],
+        [{ ...base }, "INVALID_MERGE_METHOD"],
+        [{ ...base, method: "fast-forward" }, "INVALID_MERGE_METHOD"],
+        [{ method: "merge", number: 2 }, "INVALID_REPOSITORY_ID"],
+        [{ ...base, method: "merge", number: 0 }, "INVALID_PULL_REQUEST_NUMBER"],
+        [{ ...base, method: "merge", commitTitle: " " }, "INVALID_COMMIT_TITLE"],
+        [{ ...base, method: "merge", commitTitle: "x".repeat(257) }, "INVALID_COMMIT_TITLE"],
+        [{ ...base, method: "merge", commitMessage: 5 }, "INVALID_COMMIT_MESSAGE"],
+        [{ ...base, method: "merge", expectedHeadSha: "not a sha" }, "INVALID_HEAD_SHA"],
+    ])("rejects %j", (body, code) => {
+        expect(() => validateMergeRequest(body)).toThrow(expect.objectContaining({ code }));
     });
 });

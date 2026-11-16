@@ -205,6 +205,20 @@ existing pull request). Unlike `POST /comments` it is not tied to a relay
 event, so it is not deduplicated: the caller posts once per action. GitHub's
 own message comes back as `GITHUB_COMMENT_REJECTED`.
 
+### Merge a pull request
+`POST /pull-request-merge`
+
+```ts
+{ "repositoryId": 1, "number": 7, "method": "merge" | "squash" | "rebase",
+  "commitTitle"?: string, "commitMessage"?: string, "expectedHeadSha"?: string }
+// -> { "merged": true, "sha": "...", "message": "..." }
+```
+
+`expectedHeadSha` makes GitHub refuse the merge (409) if the branch moved since
+the caller looked. When GitHub will not merge (a failing required check, a
+conflict, a method the repository does not allow) its own message comes back
+as `GITHUB_PULL_REQUEST_REJECTED`.
+
 ### List commits
 `GET /commits?repositoryId=1&branch=main&page=1&perPage=30`
 

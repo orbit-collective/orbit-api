@@ -8,6 +8,7 @@ import type {
     GitHubCombinedStatus,
     GitHubCommit,
     GitHubIssue,
+    GitHubMergeResult,
     GitHubCommitActivityWeek,
     GitHubContributor,
     GitHubPullRequestDetail,
@@ -18,6 +19,11 @@ import type {
 
 /** GitHub's largest page: the fewest requests to read every branch. */
 export const BRANCHES_PAGE_SIZE = 100;
+
+export type MergeMethod =
+    | "merge"
+    | "squash"
+    | "rebase";
 
 export type PullRequestListState =
     | "open"
@@ -183,6 +189,41 @@ export class GitHubDevelopmentClient {
                 method: "POST",
                 token,
                 body: { body },
+            },
+        );
+    }
+
+    /**
+     * Merges a pull request. GitHub refuses with 405 when it is not
+     * mergeable (a failing required check, a conflict, a method the
+     * repository does not allow) and 409 when the head moved meanwhile.
+     */
+    public mergePullRequest(
+        token: string,
+        owner: string,
+        name: string,
+        number: number,
+        options: {
+            method: MergeMethod;
+
+            commitTitle?: string;
+
+            commitMessage?: string;
+
+            expectedHeadSha?: string;
+        },
+    ): Promise<GitHubMergeResult> {
+        return githubRequest<GitHubMergeResult>(
+            `${repositoryPath(owner, name)}/pulls/${number}/merge`,
+            {
+                method: "PUT",
+                token,
+                body: {
+                    merge_method: options.method,
+                    ...(options.commitTitle !== undefined && { commit_title: options.commitTitle }),
+                    ...(options.commitMessage !== undefined && { commit_message: options.commitMessage }),
+                    ...(options.expectedHeadSha !== undefined && { sha: options.expectedHeadSha }),
+                },
             },
         );
     }

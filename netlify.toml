@@ -127,3 +127,9 @@
   to = "/.netlify/functions/github-pull-request-comment"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/pull-request-merge"
+  to = "/.netlify/functions/github-pull-request-merge"
+  status = 200
+  force = true

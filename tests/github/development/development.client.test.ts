@@ -58,6 +58,27 @@ describe("GitHubDevelopmentClient", () => {
         });
     });
 
+    it("merges with the method, and only the options it was given", async () => {
+        await client.mergePullRequest("t", "o", "r", 7, { method: "rebase" });
+        await client.mergePullRequest("t", "o", "r", 7, {
+            method: "squash",
+            commitTitle: "T",
+            commitMessage: "M",
+            expectedHeadSha: "abc1234",
+        });
+
+        expect(githubRequest).toHaveBeenNthCalledWith(1, "/repos/o/r/pulls/7/merge", {
+            method: "PUT",
+            token: "t",
+            body: { merge_method: "rebase" },
+        });
+        expect(githubRequest).toHaveBeenNthCalledWith(2, "/repos/o/r/pulls/7/merge", {
+            method: "PUT",
+            token: "t",
+            body: { merge_method: "squash", commit_title: "T", commit_message: "M", sha: "abc1234" },
+        });
+    });
+
     it("patches a pull request", async () => {
         await client.updatePullRequest("t", "o", "r", 5, { state: "closed" });
 
