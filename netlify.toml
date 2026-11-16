@@ -91,3 +91,27 @@
   to = "/.netlify/functions/github-login-resolve"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/v1/github/commits"
+  to = "/.netlify/functions/github-commits"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/github/checks"
+  to = "/.netlify/functions/github-checks"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/github/insights"
+  to = "/.netlify/functions/github-insights"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/github/pull-request-update"
+  to = "/.netlify/functions/github-pull-request-update"
+  status = 200
+  force = true

@@ -15,6 +15,18 @@ import {
 } from "@/github/actions/branch-request.validator";
 
 import {
+    DevelopmentService,
+} from "@/github/development/development.service";
+
+import {
+    handleAuthenticated,
+} from "@/github/development/development-handler";
+
+import {
+    parseRepositoryId,
+} from "@/github/development/development-request.validator";
+
+import {
     ApiError,
     handleRequest,
 } from "@/shared/errors";
@@ -27,6 +39,22 @@ export default async function handler(
     request: Request,
     _context: Context,
 ): Promise<Response> {
+    // GET lists a repository's branches; POST creates one.
+    if (request.method === "GET") {
+        return handleAuthenticated(
+            request,
+            "GET",
+            async (connection) => ({
+                branches: await new DevelopmentService().listBranches(
+                    connection,
+                    parseRepositoryId(
+                        new URL(request.url).searchParams,
+                    ),
+                ),
+            }),
+        );
+    }
+
     return handleRequest(
         async () => {
             if (

@@ -15,6 +15,21 @@ import {
 } from "@/github/actions/pull-request-request.validator";
 
 import {
+    DevelopmentService,
+} from "@/github/development/development.service";
+
+import {
+    handleAuthenticated,
+} from "@/github/development/development-handler";
+
+import {
+    parsePagination,
+    parsePullRequestNumber,
+    parsePullRequestState,
+    parseRepositoryId,
+} from "@/github/development/development-request.validator";
+
+import {
     ApiError,
     handleRequest,
 } from "@/shared/errors";
@@ -27,6 +42,44 @@ export default async function handler(
     request: Request,
     _context: Context,
 ): Promise<Response> {
+    // GET lists a repository's pull requests (or returns one in detail when
+    // `number` is given); POST creates one.
+    if (request.method === "GET") {
+        return handleAuthenticated(
+            request,
+            "GET",
+            async (connection) => {
+                const params = new URL(request.url).searchParams;
+
+                const service = new DevelopmentService();
+
+                const repositoryId = parseRepositoryId(params);
+
+                const number = parsePullRequestNumber(params);
+
+                if (number !== null) {
+                    return service.getPullRequest(
+                        connection,
+                        repositoryId,
+                        number,
+                    );
+                }
+
+                const { page, perPage } = parsePagination(params);
+
+                return {
+                    pullRequests: await service.listPullRequests(
+                        connection,
+                        repositoryId,
+                        parsePullRequestState(params),
+                        page,
+                        perPage,
+                    ),
+                };
+            },
+        );
+    }
+
     return handleRequest(
         async () => {
             if (
