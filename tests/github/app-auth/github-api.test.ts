@@ -36,6 +36,7 @@ vi.mock(
 );
 
 const {
+    githubGraphql,
     githubRequest,
 } = await import(
     "@/github/app-auth/github-api"
@@ -295,3 +296,41 @@ describe(
         );
     },
 );
+
+describe("githubGraphql", () => {
+    const ok = (body: unknown, status = 200) =>
+        fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status }));
+
+    it("posts the query and variables to /graphql and returns the data", async () => {
+        ok({ data: { repository: { id: 1 } } });
+
+        const data = await githubGraphql<{ repository: { id: number } }>("query { x }", { a: 1 }, "tok");
+
+        expect(data.repository.id).toBe(1);
+        const [url, init] = fetchMock.mock.calls[0]!;
+        expect(url).toBe("https://api.github.test/graphql");
+        expect(init.method).toBe("POST");
+        expect(init.headers.Authorization).toBe("Bearer tok");
+        expect(JSON.parse(init.body)).toEqual({ query: "query { x }", variables: { a: 1 } });
+    });
+
+    it("treats GraphQL errors, which come with HTTP 200, as a failed call carrying GitHub's message", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        ok({ errors: [{ message: "Could not resolve to a Repository" }] });
+
+        await expect(githubGraphql("q", {}, "tok")).rejects.toMatchObject({
+            code: "GITHUB_API_ERROR",
+            githubMessage: "Could not resolve to a Repository",
+        });
+    });
+
+    it("fails on an HTTP error and on a body that is not JSON", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        ok({ message: "Bad credentials" }, 401);
+        await expect(githubGraphql("q", {}, "tok")).rejects.toMatchObject({ githubStatus: 401, githubMessage: "Bad credentials" });
+
+        fetchMock.mockResolvedValue(new Response("<html>", { status: 502 }));
+        await expect(githubGraphql("q", {}, "tok")).rejects.toMatchObject({ code: "GITHUB_API_ERROR" });
+    });
+});
+

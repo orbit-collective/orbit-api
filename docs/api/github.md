@@ -254,7 +254,9 @@ Combines check runs and legacy commit statuses: `failed` if anything failed,
 
 `GET /checks?repositoryId=1&refs=sha1,sha2` (at most 20) answers
 `{ "checks": { "sha1": Checks | null, ... } }`: one call for the pull
-requests on screen, a ref whose lookup failed is `null`.
+requests on screen, a ref whose lookup failed is `null`. The refs are read
+with one GraphQL query (`statusCheckRollup`) instead of two REST calls each;
+if GraphQL cannot be used the REST lookups are the fallback.
 
 ### Insights
 `GET /insights?repositoryId=1`

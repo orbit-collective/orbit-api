@@ -7,9 +7,11 @@ import {
 } from "vitest";
 
 const githubRequest = vi.hoisted(() => vi.fn());
+const githubGraphql = vi.hoisted(() => vi.fn());
 
 vi.mock("@/github/app-auth/github-api", () => ({
     githubRequest,
+    githubGraphql,
 }));
 
 const { GitHubDevelopmentClient } = await import(
@@ -95,5 +97,48 @@ describe("GitHubDevelopmentClient", () => {
         expect(githubRequest).toHaveBeenCalledWith("/repos/o%2Fx/r%20y", {
             token: "t",
         });
+    });
+
+    it("asks for the checks of several commits in one GraphQL query and maps them to the REST shapes", async () => {
+        githubGraphql.mockResolvedValue({
+            repository: {
+                c0: {
+                    statusCheckRollup: {
+                        contexts: {
+                            nodes: [
+                                { __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: "https://ci/1", startedAt: "2026-01-01T00:00:00Z", completedAt: "2026-01-01T00:01:00Z" },
+                                { __typename: "StatusContext", context: "ci/legacy", state: "PENDING", targetUrl: null, description: "waiting" },
+                            ],
+                        },
+                    },
+                },
+                c1: { statusCheckRollup: null },
+                c2: null,
+            },
+        });
+
+        const result = await client.getChecksOfRefs("t", "o", "r", ["abc", "def", "ghi"]);
+
+        const [query, variables, token] = githubGraphql.mock.calls[0]!;
+        expect(token).toBe("t");
+        expect(variables).toEqual({ owner: "o", name: "r", ref0: "abc", ref1: "def", ref2: "ghi" });
+        expect(query).toContain("$ref0: String!");
+        expect(query).toContain("c2: object(expression: $ref2)");
+        expect(result.abc).toEqual({
+            checkRuns: {
+                total_count: 1,
+                check_runs: [{ name: "build", status: "completed", conclusion: "success", html_url: "https://ci/1", started_at: "2026-01-01T00:00:00Z", completed_at: "2026-01-01T00:01:00Z" }],
+            },
+            combined: { state: "", statuses: [{ context: "ci/legacy", state: "pending", target_url: null, description: "waiting" }] },
+        });
+        // A commit without checks has an empty result, one GitHub cannot find is null.
+        expect(result.def).toEqual({ checkRuns: { total_count: 0, check_runs: [] }, combined: { state: "", statuses: [] } });
+        expect(result.ghi).toBeNull();
+    });
+
+    it("treats a missing repository in the answer as every ref unknown", async () => {
+        githubGraphql.mockResolvedValue({ repository: null });
+
+        expect(await client.getChecksOfRefs("t", "o", "r", ["abc"])).toEqual({ abc: null });
     });
 });
