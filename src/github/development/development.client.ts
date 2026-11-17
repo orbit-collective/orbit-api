@@ -1,4 +1,5 @@
 import {
+    githubGraphql,
     githubRequest,
 } from "@/github/app-auth/github-api";
 
@@ -19,6 +20,30 @@ import type {
 
 /** GitHub's largest page: the fewest requests to read every branch. */
 export const BRANCHES_PAGE_SIZE = 100;
+
+interface GraphqlCheckContext {
+    __typename: string;
+
+    name?: string;
+
+    status?: string;
+
+    conclusion?: string | null;
+
+    detailsUrl?: string | null;
+
+    startedAt?: string | null;
+
+    completedAt?: string | null;
+
+    context?: string;
+
+    state?: string;
+
+    targetUrl?: string | null;
+
+    description?: string | null;
+}
 
 export type MergeMethod =
     | "merge"
@@ -238,6 +263,148 @@ export class GitHubDevelopmentClient {
             `${repositoryPath(owner, name)}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`,
             { token },
         );
+    }
+
+    /**
+     * The checks and commit statuses of several commits in ONE GraphQL call
+     * (the REST way is two calls per commit). A ref GitHub cannot resolve, or
+     * a commit without any checks, is null.
+     */
+    public async getChecksOfRefs(
+        token: string,
+        owner: string,
+        name: string,
+        refs: string[],
+    ): Promise<
+        Record<
+            string,
+            {
+                checkRuns: GitHubCheckRunsResponse;
+
+                combined: GitHubCombinedStatus;
+            } | null
+        >
+    > {
+        const variables: Record<string, unknown> = {
+            owner,
+            name,
+        };
+
+        const fields = refs.map(
+            (ref, index) => {
+                variables[`ref${index}`] = ref;
+
+                return `c${index}: object(expression: $ref${index}) {
+                    ... on Commit {
+                        statusCheckRollup {
+                            contexts(first: 100) {
+                                nodes {
+                                    __typename
+                                    ... on CheckRun { name status conclusion detailsUrl startedAt completedAt }
+                                    ... on StatusContext { context state targetUrl description }
+                                }
+                            }
+                        }
+                    }
+                }`;
+            },
+        );
+
+        const query = `query($owner: String!, $name: String!, ${refs
+            .map(
+                (_ref, index) =>
+                    `$ref${index}: String!`,
+            )
+            .join(", ")}) {
+            repository(owner: $owner, name: $name) {
+                ${fields.join("\n")}
+            }
+        }`;
+
+        const data = await githubGraphql<{
+            repository: Record<
+                string,
+                {
+                    statusCheckRollup?: {
+                        contexts: {
+                            nodes: GraphqlCheckContext[];
+                        };
+                    } | null;
+                } | null
+            > | null;
+        }>(
+            query,
+            variables,
+            token,
+        );
+
+        const result: Record<
+            string,
+            {
+                checkRuns: GitHubCheckRunsResponse;
+
+                combined: GitHubCombinedStatus;
+            } | null
+        > = {};
+
+        refs.forEach(
+            (ref, index) => {
+                const commit =
+                    data.repository?.[`c${index}`];
+
+                if (!commit) {
+                    result[ref] = null;
+
+                    return;
+                }
+
+                const nodes =
+                    commit.statusCheckRollup?.contexts
+                        .nodes ?? [];
+
+                const checkRuns = nodes.flatMap(
+                    (node) =>
+                        node.__typename === "CheckRun"
+                            ? [{
+                                name: node.name ?? "",
+                                status: (node.status ?? "").toLowerCase(),
+                                conclusion:
+                                    node.conclusion
+                                        ? node.conclusion.toLowerCase()
+                                        : null,
+                                html_url: node.detailsUrl ?? null,
+                                started_at: node.startedAt ?? null,
+                                completed_at: node.completedAt ?? null,
+                            }]
+                            : [],
+                );
+
+                const statuses = nodes.flatMap(
+                    (node) =>
+                        node.__typename === "StatusContext"
+                            ? [{
+                                context: node.context ?? "",
+                                state: (node.state ?? "").toLowerCase(),
+                                target_url: node.targetUrl ?? null,
+                                description: node.description ?? null,
+                            }]
+                            : [],
+                );
+
+                result[ref] = {
+                    checkRuns: {
+                        total_count: checkRuns.length,
+                        check_runs: checkRuns,
+                    },
+                    combined: {
+                        state: "",
+                        statuses,
+                    },
+                };
+            },
+        );
+
+        return result;
     }
 
     public getCombinedStatus(

@@ -186,6 +186,43 @@ describe("DevelopmentService", () => {
         expect((await service.listPullRequests(connection, 1, "all", 1, 3, undefined, false)).hasMore).toBe(false);
     });
 
+    it("reads the CI of every ref in ONE GraphQL call and summarises it", async () => {
+        const getChecksOfRefs = vi.fn().mockResolvedValue({
+            a: {
+                checkRuns: {
+                    total_count: 2,
+                    check_runs: [
+                        { name: "build", status: "completed", conclusion: "success", html_url: null, started_at: null, completed_at: null },
+                        { name: "lint", status: "completed", conclusion: "failure", html_url: null, started_at: null, completed_at: null },
+                    ],
+                },
+                combined: { state: "", statuses: [] },
+            },
+            b: null,
+        });
+        const { service, client } = makeService({ getChecksOfRefs });
+
+        const checks = await service.getChecksBatch(connection, 1, ["a", "b"]);
+
+        expect(getChecksOfRefs).toHaveBeenCalledTimes(1);
+        expect(getChecksOfRefs).toHaveBeenCalledWith("tok", "o", "r", ["a", "b"]);
+        expect(checks.a).toMatchObject({ state: "failed", passed: 1, failed: 1 });
+        expect(checks.b).toBeNull();
+        // Not a single REST call per commit.
+        expect(client.getCheckRuns).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the REST lookups when GraphQL cannot be used", async () => {
+        const { service, client } = makeService({
+            getChecksOfRefs: vi.fn().mockRejectedValue(new ApiError("GITHUB_API_ERROR", "x", 502)),
+        });
+
+        const checks = await service.getChecksBatch(connection, 1, ["a"]);
+
+        expect(client.getCheckRuns).toHaveBeenCalledWith("tok", "o", "r", "a");
+        expect(checks.a?.state).toBe("none");
+    });
+
     it("reads CI of several refs at once, and a failing one is null", async () => {
         const { service } = makeService({
             getCheckRuns: vi.fn(async (_t: string, _o: string, _r: string, ref: string) => {

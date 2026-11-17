@@ -362,6 +362,33 @@ export class DevelopmentService {
 
         const checks: Record<string, CiSummaryDto | null> = {};
 
+        // One GraphQL call for every ref; the REST way is two calls each, so it
+        // is only the fallback when GraphQL cannot be used (a permission, an outage).
+        try {
+            const found =
+                await this.client.getChecksOfRefs(
+                    token,
+                    repository.owner,
+                    repository.name,
+                    refs,
+                );
+
+            for (const ref of refs) {
+                const entry = found[ref];
+
+                checks[ref] = entry
+                    ? summariseCi(
+                        entry.checkRuns,
+                        entry.combined,
+                    )
+                    : null;
+            }
+
+            return checks;
+        } catch {
+            // Falls through to the per-ref lookups below.
+        }
+
         await mapWithConcurrency(
             refs,
             CI_LOOKUP_CONCURRENCY,
